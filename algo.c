@@ -16,8 +16,8 @@ int* create_shifts (char* pattern);
 int main(int argc, char* argv[])
 {
   
-  char* test_str = "ABARDACARBEABGABARBE";
-  char* test_pattern = "ABARB";
+  char* test_str = "uuuu";
+  char* test_pattern = "u";
   int occ = horspool_match(test_pattern, test_str);
   printf("Occurences of %s: %d\n", test_pattern, occ);
   return 0;
@@ -47,7 +47,7 @@ int horspool_match (char* pattern, char* text)
 
   int i = pat_length - 1;
   int k = 0;
-  while(i < text_length - 1) {
+  while(i < text_length) {
     k = 0;
     while(k <= pat_length - 1 && pattern[pat_length - 1 - k] == text[i - k]) {
       k++;
