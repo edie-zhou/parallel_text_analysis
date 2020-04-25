@@ -15,9 +15,11 @@ int* create_shifts (char* pattern);
  */
 int main(int argc, char* argv[])
 {
-  char* test_str = "under the nut butt hut";
+  
+  char* test_str = "ABARDACARBEABGABARBE";
   char* test_pattern = "ABARB";
   int occ = horspool_match(test_pattern, test_str);
+  printf("Occurences of %s: %d\n", test_pattern, occ);
   return 0;
 }
 
@@ -37,9 +39,27 @@ int horspool_match (char* pattern, char* text)
   // Offset for first ASCII character
   const int ASCII_OFF = 32;
 
-  int num_occ;
+  int num_occ = 0;
 
   int* table = create_shifts (pattern);
+  int pat_length = strlen(pattern);
+  int text_length = strlen(text);
+
+  int i = pat_length - 1;
+  int k = 0;
+  while(i < text_length - 1) {
+    k = 0;
+    while(k <= pat_length - 1 && pattern[pat_length - 1 - k] == text[i - k]) {
+      k++;
+    }
+    if(k == pat_length) {
+      num_occ++;
+      i++;
+      //i = i - pat_length  + 1;
+    } else {
+      i = i + table[text[i] - 32];
+    }
+  }
 
 // Test pattern table
 // const int TABLE_SIZ = 95;
