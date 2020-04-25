@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+const int ASCII_OFF = 32;
+
 int horspool_match (char* pattern, char* text);
 int* create_shifts (char* pattern);
 
@@ -16,8 +18,8 @@ int* create_shifts (char* pattern);
 int main(int argc, char* argv[])
 {
   
-  char* test_str = "uuuu";
-  char* test_pattern = "u";
+  char* test_str = "~~,  <-----";
+  char* test_pattern = "~~,  ";
   int occ = horspool_match(test_pattern, test_str);
   printf("Occurences of %s: %d\n", test_pattern, occ);
   return 0;
@@ -37,7 +39,7 @@ int main(int argc, char* argv[])
 int horspool_match (char* pattern, char* text)
 {
   // Offset for first ASCII character
-  const int ASCII_OFF = 32;
+
 
   int num_occ = 0;
 
@@ -57,7 +59,7 @@ int horspool_match (char* pattern, char* text)
       i++;
       //i = i - pat_length  + 1;
     } else {
-      i = i + table[text[i] - 32];
+      i = i + table[text[i] - ASCII_OFF];
     }
   }
 
@@ -90,7 +92,7 @@ int* create_shifts (char* pattern)
     shift_table[i] = length;
   }
   for(int j = 0; j < length - 1; j++) {
-    shift_table[pattern[j] - 32] = length - 1 - j;
+    shift_table[pattern[j] - ASCII_OFF] = length - 1 - j;
   }
 
   return shift_table;
