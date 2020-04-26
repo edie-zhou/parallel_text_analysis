@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
   // printf("Occurences of %s: %d\n", test_pattern, occ);
   
   int line_start, line_end;
-  int pat_length = strlen(test_pattern);
+  int pat_len = strlen(test_pattern);
   printf("%d matches found!\n", num_matches);
   for (int i = 0; i < num_matches; ++i) {
     printf("\n");
@@ -36,11 +36,11 @@ int main(int argc, char* argv[])
     line_start = get_line_start(test_str, occ[i]);
     
     // get exclusive line end
-    line_end = get_line_end(test_str, occ[i], pat_length);
+    line_end = get_line_end(test_str, occ[i], pat_len);
 
     // printf("Line start: %d, end: %d\n", line_start, line_end);
     // print line that pattern was found at
-    print_line (test_str, line_start, line_end, occ[i], pat_length);
+    print_line (test_str, line_start, line_end, occ[i], pat_len);
   }
   printf("\n");
   
@@ -66,26 +66,26 @@ int* horspool_match (char* pattern, char* text, int* num_matches)
   int size = 0;
 
   int* table = create_shifts(pattern);
-  int pat_length = strlen(pattern);
+  int pat_len = strlen(pattern);
   int text_length = strlen(text);
 
-  int i = pat_length - 1;
+  int i = pat_len - 1;
   int k = 0;
   while(i < text_length) {
+    // reset matched character count
     k = 0;
-    while(k <= pat_length - 1 && pattern[pat_length - 1 - k] == text[i - k]) {
-      // increment number of matched characters
+    while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
+      // increment matched character count
       k++;
     }
-    if(k == pat_length) {
+    if(k == pat_len) {
       // store result index, rellocate result array
       size = ((idx) * sizeof(int)) + sizeof(int);
       result = (int*) realloc(result, size);
-      result[idx] = i - pat_length + 1;
+      result[idx] = i - pat_len + 1;
       
-      // increment result index, number of matches found, increment text index
+      // number of matches found, increment result index, increment text index
       ++idx;
-      ++(*num_matches);
       ++i;
       
     } else {
@@ -93,6 +93,8 @@ int* horspool_match (char* pattern, char* text, int* num_matches)
     }
   }
 
+  // Add to number of matches found
+  *num_matches += idx;
   return result;
 }
 
@@ -186,7 +188,7 @@ int get_line_end (char* text, int idx, int pattern_len)
 
 /**
  *  Purpose:
- *    Print c-string substring using indices
+ *    Print c-string substring using indices with pattern highlighted in red
  * 
  *  Args:
  *    text      {char*}: Target c-string
@@ -209,15 +211,18 @@ void print_line (char* text, int start_index, int end_index, int pat_start, int 
   
   for (int i = start_index; i < end_index; ++i) {
     if(i == pat_start) {
+      // apply red highlight to pattern
       printf(ANSI_COLOR_RED);
       is_red = 1;
     } else if (i == pat_end) {
+      // remove red highlight
       printf(ANSI_COLOR_RESET);
     }
     printf("%c", text[i]);
   }
 
   if (is_red) {
+    // Remove highlight if still applied by line end
     printf(ANSI_COLOR_RESET);
   }
 }
