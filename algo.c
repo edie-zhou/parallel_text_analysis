@@ -47,8 +47,9 @@ int* horspool_match (char* pattern, char* text)
 {
   // Offset for first ASCII character
   const int ASCII_OFF = 32;
+  const char NEW_LINE = '\n';
 
-  int* result;
+  int* result = (int*) malloc(0);
   int idx = 0;
   int size = 0;
 
@@ -61,16 +62,22 @@ int* horspool_match (char* pattern, char* text)
   while(i < text_length) {
     k = 0;
     while(k <= pat_length - 1 && pattern[pat_length - 1 - k] == text[i - k]) {
+      // increment number of matched characters
       k++;
     }
     if(k == pat_length) {
-      // store result index, rellocate result
+      // store result index, rellocate result array
       size = ((idx) * sizeof(int)) + sizeof(int);
       result = (int*) realloc(result, size);
       result[idx] = i - pat_length + 1;
       ++idx;
       
+      // increment text index
       i++;
+      while (text[i] == NEW_LINE) {
+        // Skip over new lines
+        ++i;
+      }
     } else {
       i = i + table[text[i] - ASCII_OFF];
     }
