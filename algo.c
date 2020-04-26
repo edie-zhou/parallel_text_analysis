@@ -7,10 +7,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-int* horspool_match (char* pattern, char* text);
+int* horspool_match (char* pattern, char* text, int* num_matches);
 int* create_shifts (char* pattern);
 int get_line_start (char* text, int idx);
 int get_line_end (char* text, int idx, int pattern_len);
+void print_line (char* text, int start_index, int end_index);
 
 /**
  *  Driver function
@@ -18,17 +19,32 @@ int get_line_end (char* text, int idx, int pattern_len);
 int main(int argc, char* argv[])
 {
   
-  char* test_str = "test\n\nm\natestatest\ntest";
+  char* test_str = "test\nno string here\nm\natestatest\ntest";
   char* test_pattern = "test";
-  int* occ = horspool_match(test_pattern, test_str);
+  int num_matches = 0;
+  int* occ = horspool_match(test_pattern, test_str, &num_matches);
   // printf("Occurences of %s: %d\n", test_pattern, occ);
   
-  size_t occ_size = sizeof(occ) / sizeof(int);
-  for (int i = 0; i < occ_size; ++i) {
-    printf("pattern found at index %d\n", occ[i]);
-  }
-
+  int line_start, line_end;
   int pat_length = strlen(test_pattern);
+  printf("%d matches found!\n", num_matches);
+  for (int i = 0; i < num_matches; ++i) {
+    printf("\n");
+    // printf("Pattern found at index %d!\n", occ[i]);
+
+    // get inclusive line start
+    line_start = get_line_start(test_str, occ[i]);
+    
+    // get exclusive line end
+    line_end = get_line_end(test_str, occ[i], pat_length);
+
+    // printf("Line start: %d, end: %d\n", line_start, line_end);
+    // print line that pattern was found at
+    print_line (test_str, line_start, line_end);
+    
+  }
+  printf("\n");
+  
   return 0;
 }
 
@@ -37,18 +53,15 @@ int main(int argc, char* argv[])
  *    Boyer-Moore-Horspool pattern matching algorithm implementation
  * 
  *  Args:
- *    pattern {char*}: desired pattern c-string 
- *    text    {char*}: text c-string
+ *    pattern     {char*}: desired pattern c-string 
+ *    text        {char*}: text c-string
+ *    num_matches {char*}: Pointer to number of matches found
  * 
  *  Returns:
  *    {int*}: Array of found pattern indices
  */ 
-int* horspool_match (char* pattern, char* text)
+int* horspool_match (char* pattern, char* text, int* num_matches)
 {
-  // Offset for first ASCII character
-  // const int ASCII_OFF = 32;
-  const char NEW_LINE = '\n';
-
   int* result = (int*) malloc(0);
   int idx = 0;
   int size = 0;
@@ -70,30 +83,16 @@ int* horspool_match (char* pattern, char* text)
       size = ((idx) * sizeof(int)) + sizeof(int);
       result = (int*) realloc(result, size);
       result[idx] = i - pat_length + 1;
+      
+      // increment result index, number of matches found, increment text index
       ++idx;
+      ++(*num_matches);
+      ++i;
       
-      // increment text index
-      i++;
-      // printf("%d\n",text[i]);
-      
-      printf("Index: %d: %d, matched chars: %d\n",i, text[i], k);
     } else {
       i = i + table[text[i]];
     }
-
-    // while (text[i] == NEW_LINE) {
-    //   // Skip over new lines
-    //   printf("skipped new line at %d\n", i);
-    //   ++i;
-    // }
   }
-
-// Test pattern table
-// const int TABLE_SIZ = 95;
-// for (int i = 0; i < TABLE_SIZ; ++i) {
-//   char entry = i + ASCII_OFF;
-//   printf("char: %c, offset: %d\n", entry, table[i]);
-// }
 
   return result;
 }
@@ -152,6 +151,7 @@ int get_line_start (char* text, int idx)
   int start_idx = idx;
 
   while (start_idx != 0 && text[start_idx] != NEW_LINE) {
+    // decrement until new line or text start reached
     --start_idx;
   }
 
@@ -168,21 +168,40 @@ int get_line_start (char* text, int idx)
  *    pattern_len  {int}: Optional param, pass if you know pattern length
  *  
  *  Returns:
- *    {char*}: Inclusive line end index 
+ *    {char*}: Exclusive line end index 
  */ 
 int get_line_end (char* text, int idx, int pattern_len)
 {
   const char NULL_TERM = '\0';
   const char NEW_LINE = '\n';
 
-  int end_idx = idx;
+  int end_idx = idx + pattern_len - 1;
 
   while (text[end_idx] != NULL_TERM && text[end_idx] != NEW_LINE) {
-    // Increment until new line or null terminator
+    // Increment until new line or null terminator found in text
     ++end_idx;
   }
 
-  return end_idx - 1;
+  return end_idx;
+}
+
+/**
+ *  Purpose:
+ *    Print c-string substring using indices
+ * 
+ *  Args:
+ *    text      {char*}: Target c-string
+ *    start_idx   {int}: Inclusive substring start index
+ *    end_idx     {int}: Exclusive substring end index
+ * 
+ *  Returns:
+ *    None
+ */ 
+void print_line (char* text, int start_index, int end_index) 
+{
+  for (int i = start_index; i < end_index; ++i) {
+    printf("%c", text[i]);
+  }
 }
 
 
