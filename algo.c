@@ -9,7 +9,7 @@
 
 const int ASCII_OFF = 32;
 
-int horspool_match (char* pattern, char* text);
+int* horspool_match (char* pattern, char* text);
 int* create_shifts (char* pattern);
 
 /**
@@ -18,10 +18,10 @@ int* create_shifts (char* pattern);
 int main(int argc, char* argv[])
 {
   
-  char* test_str = "~~,  <-----";
-  char* test_pattern = "~~,  ";
-  int occ = horspool_match(test_pattern, test_str);
-  printf("Occurences of %s: %d\n", test_pattern, occ);
+  char* test_str = "test\nme\ntest me please";
+  char* test_pattern = "test";
+  int* occ = horspool_match(test_pattern, test_str);
+  // printf("Occurences of %s: %d\n", test_pattern, occ);
   return 0;
 }
 
@@ -34,16 +34,18 @@ int main(int argc, char* argv[])
  *    text    {char*}: text c-string
  * 
  *  Returns:
- *    {int}: Number of found pattern instances
+ *    {int*}: Array of found pattern indices
  */ 
-int horspool_match (char* pattern, char* text)
+int* horspool_match (char* pattern, char* text)
 {
   // Offset for first ASCII character
 
 
-  int num_occ = 0;
+  int* result;
+  int idx = 0;
+  int size = 0;
 
-  int* table = create_shifts (pattern);
+  int* table = create_shifts(pattern);
   int pat_length = strlen(pattern);
   int text_length = strlen(text);
 
@@ -55,9 +57,13 @@ int horspool_match (char* pattern, char* text)
       k++;
     }
     if(k == pat_length) {
-      num_occ++;
+      // store result index, rellocate result
+      size = ((idx) * sizeof(int)) + sizeof(int);
+      result = (int*) realloc(result, size);
+      result[idx] = i - pat_length + 1;
+      ++idx;
+      
       i++;
-      //i = i - pat_length  + 1;
     } else {
       i = i + table[text[i] - ASCII_OFF];
     }
@@ -70,7 +76,7 @@ int horspool_match (char* pattern, char* text)
 //   printf("char: %c, offset: %d\n", entry, table[i]);
 // }
 
-  return num_occ;
+  return result;
 }
 
 /**
