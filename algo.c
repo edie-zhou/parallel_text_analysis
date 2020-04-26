@@ -18,14 +18,14 @@ int get_line_end (char* text, int idx, int pattern_len);
 int main(int argc, char* argv[])
 {
   
-  char* test_str = "test\nme\ntest me please";
+  char* test_str = "test\n\nm\natestatest\ntest";
   char* test_pattern = "test";
   int* occ = horspool_match(test_pattern, test_str);
   // printf("Occurences of %s: %d\n", test_pattern, occ);
   
   size_t occ_size = sizeof(occ) / sizeof(int);
   for (int i = 0; i < occ_size; ++i) {
-    printf("%d\n", occ[i]);
+    printf("pattern found at index %d\n", occ[i]);
   }
 
   int pat_length = strlen(test_pattern);
@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 int* horspool_match (char* pattern, char* text)
 {
   // Offset for first ASCII character
-  const int ASCII_OFF = 32;
+  // const int ASCII_OFF = 32;
   const char NEW_LINE = '\n';
 
   int* result = (int*) malloc(0);
@@ -74,13 +74,18 @@ int* horspool_match (char* pattern, char* text)
       
       // increment text index
       i++;
-      while (text[i] == NEW_LINE) {
-        // Skip over new lines
-        ++i;
-      }
+      // printf("%d\n",text[i]);
+      
+      printf("Index: %d: %d, matched chars: %d\n",i, text[i], k);
     } else {
-      i = i + table[text[i] - ASCII_OFF];
+      i = i + table[text[i]];
     }
+
+    // while (text[i] == NEW_LINE) {
+    //   // Skip over new lines
+    //   printf("skipped new line at %d\n", i);
+    //   ++i;
+    // }
   }
 
 // Test pattern table
@@ -103,11 +108,14 @@ int* horspool_match (char* pattern, char* text)
 int* create_shifts (char* pattern)
 {
   // Offset for first ASCII character
-  const int ASCII_OFF = 32;
+  // const int ASCII_OFF = 32;
 
-  // Printable ASCII chars are 32-126 inclusive
-  const int TABLE_SIZ = 95;
-  
+  // Line break ASCII value
+  const char LINE_BREAK = '\n';
+
+  // Printable ASCII chars are 32-126 inclusive, line break is 10
+  const int TABLE_SIZ = 126;
+
   int length = strlen(pattern);
   int* shift_table = (int*) malloc (sizeof(int) * TABLE_SIZ);
   
@@ -117,9 +125,12 @@ int* create_shifts (char* pattern)
   }
   for(int j = 0; j < length - 1; j++) {
     // set pattern characters to shortest shifts
-    shift_table[pattern[j] - ASCII_OFF] = length - 1 - j;
+    shift_table[pattern[j]] = length - 1 - j;
   }
 
+  // assign shift of 1 for line breaks
+  shift_table[LINE_BREAK] = 1;
+ 
   return shift_table;
 }
 
