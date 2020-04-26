@@ -9,8 +9,8 @@
 
 int* horspool_match (char* pattern, char* text);
 int* create_shifts (char* pattern);
-char* get_line_start (char* text, int idx);
-char* get_line_end (char* text, int idx, int pattern_len);
+int get_line_start (char* text, int idx);
+int get_line_end (char* text, int idx, int pattern_len);
 
 /**
  *  Driver function
@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
   
   size_t occ_size = sizeof(occ) / sizeof(int);
   for (int i = 0; i < occ_size; ++i) {
-    print("%d\n", occ[i]);
+    printf("%d\n", occ[i]);
   }
 
   int pat_length = strlen(test_pattern);
@@ -125,9 +125,9 @@ int* create_shifts (char* pattern)
  *    idx          {int}: Pattern start index
  *  
  *  Returns:
- *    {char*}: Line of text  
+ *    {int}: Inclusive line start index  
  */ 
-char* get_line_start (char* text, int idx)
+int get_line_start (char* text, int idx)
 {
   const char NEW_LINE = '\n';
 
@@ -142,7 +142,7 @@ char* get_line_start (char* text, int idx)
 
 /**
  *  Purpose:
- *    Get inclusive text line end index from pattern index
+ *    Get text line end index from pattern index
  *  
  *  Args:
  *    text       {char*}: Text c-string
@@ -150,9 +150,9 @@ char* get_line_start (char* text, int idx)
  *    pattern_len  {int}: Optional param, pass if you know pattern length
  *  
  *  Returns:
- *    {char*}: Line of text  
+ *    {char*}: Inclusive line end index 
  */ 
-char* get_line_end (char* text, int idx, int pattern_len)
+int get_line_end (char* text, int idx, int pattern_len)
 {
   const char NULL_TERM = '\0';
   const char NEW_LINE = '\n';
