@@ -11,7 +11,7 @@ int* horspool_match (char* pattern, char* text, int* num_matches);
 int* create_shifts (char* pattern);
 int get_line_start (char* text, int idx);
 int get_line_end (char* text, int idx, int pattern_len);
-void print_line (char* text, int start_index, int end_index);
+void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
 
 /**
  *  Driver function
@@ -40,8 +40,7 @@ int main(int argc, char* argv[])
 
     // printf("Line start: %d, end: %d\n", line_start, line_end);
     // print line that pattern was found at
-    print_line (test_str, line_start, line_end);
-    
+    print_line (test_str, line_start, line_end, occ[i], pat_length);
   }
   printf("\n");
   
@@ -193,14 +192,33 @@ int get_line_end (char* text, int idx, int pattern_len)
  *    text      {char*}: Target c-string
  *    start_idx   {int}: Inclusive substring start index
  *    end_idx     {int}: Exclusive substring end index
+ *    pat_start   {int}: Index of first pattern character
+ *    pat_len     {int}: Pattern length
  * 
  *  Returns:
  *    None
  */ 
-void print_line (char* text, int start_index, int end_index) 
+
+#define ANSI_COLOR_RED "\x1b[31m"
+#define ANSI_COLOR_RESET "\x1b[0m"
+
+void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len) 
 {
+  int is_red = 0;
+  int pat_end = pat_start + pat_len; 
+  
   for (int i = start_index; i < end_index; ++i) {
+    if(i == pat_start) {
+      printf(ANSI_COLOR_RED);
+      is_red = 1;
+    } else if (i == pat_end) {
+      printf(ANSI_COLOR_RESET);
+    }
     printf("%c", text[i]);
+  }
+
+  if (is_red) {
+    printf(ANSI_COLOR_RESET);
   }
 }
 
