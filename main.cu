@@ -1,15 +1,19 @@
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <iostream>
 #include <cuda_runtime.h>
 
 #include "input.h"
 
+using namespace std;
+
 const int ASCII_OFF = 32;
 const int chunkSize = 512;
 
-char * readFile (char * filename,  long * numStrings, long * file_length){
+/*char * readFile (char * filename,  long * numStrings, long * file_length){
     char * buffer = 0;
     FILE * f = fopen (filename, "rb");
     long length = 0;    
@@ -35,7 +39,7 @@ char * readFile (char * filename,  long * numStrings, long * file_length){
 
 
 return buffer;
-}
+}*/
 
 long * calcIndexes(long num_strings, long length){
     long * indexArray = ( long *)malloc(sizeof( long) * (num_strings+2));
@@ -48,27 +52,6 @@ long * calcIndexes(long num_strings, long length){
    indexArray[i] = sum + (length - ((num_strings-1) * chunkSize));
    indexArray[++i] = NULL;
    return indexArray;
-}
-
-
-
-int main(){
-    char * filename = "sample-texts/J. K. Rowling - Harry Potter 3 - Prisoner of Azkaban.txt";
-    long numStrings;
-    long file_length;
-    char * buffer = readFile(filename,&numStrings, &file_length);
-    long * indexArray = calcIndexes(numStrings, file_length);
-    for(long i=0; i< numStrings+2; i++){
-        printf("%ld is the start index of string %ld\n", indexArray[i], i);
-    }
-
-    char * pattern
-
-
-
-    
-
-    return 212;
 }
 
 /**
@@ -88,6 +71,11 @@ void print_line (char* text, int start_index, int end_index, int pat_start, int 
 */
 int main(int argc, char* argv[])
 {
+	Input inputObj;
+	/*vector<string_chunk> chunks = inputObj.getChunks();
+	for (int i = 0; i < chunks.size(); i++) {
+		cout << chunks.at(i).str << endl;
+	}
 
     char* test_str = "test\nno string here\nm\natestatesta\ntest";
     char* test_pattern = "test";
@@ -115,7 +103,7 @@ int main(int argc, char* argv[])
         // print line that pattern was found at
         print_line (test_str, line_start, line_end, occ[i], pat_len);
     }
-    printf("\n");
+    printf("\n");*/
 
     return 0;
 }
@@ -136,9 +124,9 @@ int main(int argc, char* argv[])
 *  Returns:
 *    {int*}: 
 */ 
-void horspool_match (char* text, int* index_array, char* pattern, int pat_len,
-    int* skip, int* num_matches, int* d_out)
-{
+int* horspool_match (char* text, int index_array, int txt_end, char* pattern, int pat_len,
+    int* skip, int* num_matches/*, int* d_out*/)
+{/*
     int* result = (int*) malloc(0);
     int idx = 0;
     int size = 0;
@@ -178,7 +166,8 @@ void horspool_match (char* text, int* index_array, char* pattern, int pat_len,
     // Add to number of matches found
     *num_matches += idx;
     d_out = result;
-//    return result;
+//    return result;*/
+	return NULL;
 }
 
 /**
