@@ -1,45 +1,42 @@
-#include <stdio.h>
-#include <malloc.h>
-#include <vector>
-#include <iostream>
-
+#include "input.h"
 
 using namespace std;
 
-int stringCount = 0;
+char** array_from_chunk_vector();
 
-char ** splitOnChars(char * filename){
-    FILE *fptr;
-	fptr=fopen("J. K. Rowling - Harry Potter 3 - Prisoner of Azkaban.txt","r");
-    vector<char*> split_array ;  
-    char ch;
-    while((ch=fgetc(fptr))!=EOF) {
-        char * tempString = (char*)malloc(512 * sizeof(char));
-        for(int count = 0; (count < 511 && (ch=fgetc(fptr))!=EOF); count++ ){
-            if(ch != '\n'){
-                tempString[count] = ch;
-            }
-            else{
-                count--;
-            }
-        }
-        tempString[511] = '\0';
-        split_array.push_back(tempString);
-        stringCount++;
+char** splitOnChars(char* filename) {
+	stringCount = 0;
+	FILE* fptr;
+	fptr = fopen("sample_texts/J. K. Rowling - Harry Potter 3 - Prisoner of Azkaban.txt", "r");
+	char ch;
+	while ((ch = fgetc(fptr)) != EOF) {
+		char* tempString = (char*)malloc(512 * sizeof(char));
+		string_chunk chunk;
+		chunk.str = tempString;
+		tempString[0] = ch;
+		if (ch == '\n') {
+			globalIndices.push_back(chunks.size() * CHUNK_SIZE);
+			chunk.newLineIndices.push_back(0);
+			chunk.lineNumbers.push_back(globalIndices.size());
+		}
+		for (int count = 1; (count < CHUNK_SIZE && (ch = fgetc(fptr)) != EOF); count++) {
+			tempString[count] = ch;
+			if (ch == '\n') {
+				globalIndices.push_back(chunks.size() * CHUNK_SIZE + count);
+				chunk.newLineIndices.push_back(count);
+				chunk.newLineIndices.push_back(globalIndices.size());
+			}
+		}
+		stringCount++;
+		chunks.push_back(chunk);
 	}
-    split_array.push_back(NULL);
-    char** array = (char**)&split_array[0];     
-return array;
+	return array_from_chunk_vector();
 }
 
-
-
-int main() {
-
-    char ** result = splitOnChars(NULL);
-    for(int i=0; result[i] != NULL; i++){
-        cout << result[i] << "\n";
-    }
+char** array_from_chunk_vector() {
+	char** result = (char**)malloc(chunks.size() * sizeof(char*));
+	for (int i = 0; i < chunks.size(); i++) {
+		result[i] = chunks.at(i).str;
+	}
+	return result;
 }
-
-
