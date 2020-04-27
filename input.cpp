@@ -6,16 +6,29 @@ using namespace std;
 
 Input::Input() {
 	filename = "sample-texts/J. K. Rowling - Harry Potter 3 - Prisoner of Azkaban.txt";
+	flattenedText = false;
 	splitOnChars();
 }
 
 Input::Input(const char* fname) {
 	filename = fname;
+	flattenedText = false;
 	splitOnChars();
 }
 
 Input::~Input() {
 	clean();
+}
+
+char* Input::flattenText() {
+	flattenedText = (char*)malloc(chunks.size() * CHUNK_SIZE * sizeof(char));
+	for (int row = 0; row < chunks.size(); row++) {
+		for (int col = 0; col < CHUNK_SIZE; col++) {
+			flattenedText[CHUNK_SIZE * row + col] = cStyleArrStrings[row][col];
+		}
+	}
+	flattenedTextBool = true;
+	return flattenedText;
 }
 
 void Input::splitOnChars() {
@@ -60,5 +73,6 @@ void Input::clean() {
 		free(chunks.at(i).str);
 	}
 	free(cStyleArrStrings);
+	if (flattenedTextBool) free(flattenedText);
 	return;
 }

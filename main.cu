@@ -4,42 +4,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <iostream>
-#include <cuda_runtime.h>
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
 
 #include "input.h"
+
+#define NUM_THREADS_PER_BLOCK 512
+
+__global__ void horspool_match(char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size) {
+	if (blockIdx.x == 0 && threadIdx.x == 0) {
+		*num_matches = 0;
+	}
+}
 
 using namespace std;
 
 const int ASCII_OFF = 32;
 const int chunkSize = 512;
-
-/*char * readFile (char * filename,  long * numStrings, long * file_length){
-    char * buffer = 0;
-    FILE * f = fopen (filename, "rb");
-    long length = 0;    
-    long num_strings;
-    if (f)
-    {
-    fseek (f, 0, SEEK_END);
-    length = ftell (f);
-    num_strings = length/chunkSize;
-    if(length % chunkSize != 0){
-        num_strings++;
-    }
-    fseek (f, 0, SEEK_SET);
-    buffer = (char *) malloc(length);
-    if (buffer)
-    {   
-        fread (buffer, 1, length, f);
-    }
-    fclose (f);
-    }
-    *numStrings = num_strings;
-    *file_length = length;
-
-
-return buffer;
-}*/
 
 long * calcIndexes(long num_strings, long length){
     long * indexArray = ( long *)malloc(sizeof( long) * (num_strings+2));
@@ -59,29 +40,64 @@ long * calcIndexes(long num_strings, long length){
  *  Single thread implementation of boyer-moore
  */
 
-int* horspool_match (char* text, int txt_start, int txt_end, char* pattern, int pat_len,
-int* skip, int* num_matches);
+/*int* horspool_match (char* text, int txt_start, int txt_end, char* pattern, int pat_len,
+int* skip, int* num_matches);*/
 int* create_shifts (char* pattern);
 int get_line_start (char* text, int idx);
 int get_line_end (char* text, int idx, int pattern_len);
 void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
 
-/**
-*  Driver function
-*/
+int determineNumBlocks(vector<string_chunk> chunks) {
+	int numBlocks = 0;
+	for (int i = 0; i < chunks.size(); i = i + NUM_THREADS_PER_BLOCK) {
+		numBlocks++;
+	}
+	return numBlocks;
+}
+
 int main(int argc, char* argv[])
 {
 	Input inputObj;
-	/*vector<string_chunk> chunks = inputObj.getChunks();
-	for (int i = 0; i < chunks.size(); i++) {
-		cout << chunks.at(i).str << endl;
-	}
 
-    char* test_str = "test\nno string here\nm\natestatesta\ntest";
-    char* test_pattern = "test";
+	char* flatText = inputObj.flattenText();
+	char* testPattern = (char*)malloc(5 * sizeof(char));
+	testPattern = strcpy(testPattern, "test");
+    int* skipTable = create_shifts(testPattern);
+	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
+	*numMatches = 0;
+	int fullTextSize = inputObj.getChunks().size() * CHUNK_SIZE * sizeof(char);
+	int patternSize = strlen(testPattern) * sizeof(char);
+	int skipTableSize = strlen(testPattern) * sizeof(int);
 
-    int* skip = create_shifts(test_pattern);
-    int num_matches = 0;
+	char* d_fullText;
+	char* d_testPattern;
+	int* d_skipTable;
+	unsigned int* d_numMatches;
+
+	cudaMalloc((void**)& d_fullText, fullTextSize);
+	cudaMalloc((void**)& d_testPattern, patternSize);
+	cudaMalloc((void**)& d_skipTable, skipTableSize);
+	cudaMalloc((void**)& d_numMatches, sizeof(unsigned int));
+
+	cudaMemcpy(d_fullText, flatText, fullTextSize, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_testPattern, testPattern, patternSize, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_skipTable, skipTable, skipTableSize, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_numMatches, numMatches, sizeof(unsigned int), cudaMemcpyHostToDevice);
+
+	int numBlocks = determineNumBlocks(inputObj.getChunks());
+	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE);
+
+	cudaMemcpy(numMatches, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+	
+	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches);
+	
+	cout << "Number of Matches: " << *numMatches << endl;
+
+	free(testPattern);
+	free(skipTable);
+	free(numMatches);
+
+    /*int num_matches = 0;
     int* occ = horspool_match (test_str, 0, strlen(test_str), test_pattern, strlen(test_pattern),
         skip, &num_matches);
     // printf("Occurences of %s: %d\n", test_pattern, occ);
@@ -124,9 +140,9 @@ int main(int argc, char* argv[])
 *  Returns:
 *    {int*}: 
 */ 
-int* horspool_match (char* text, int index_array, int txt_end, char* pattern, int pat_len,
-    int* skip, int* num_matches/*, int* d_out*/)
-{/*
+/*int* horspool_match (char* text, int index_array, int txt_end, char* pattern, int pat_len,
+    int* skip, int* num_matches, int* d_out)
+{
     int* result = (int*) malloc(0);
     int idx = 0;
     int size = 0;
@@ -166,9 +182,9 @@ int* horspool_match (char* text, int index_array, int txt_end, char* pattern, in
     // Add to number of matches found
     *num_matches += idx;
     d_out = result;
-//    return result;*/
+//    return result;
 	return NULL;
-}
+}*/
 
 /**
 *  Purpose:
@@ -179,29 +195,19 @@ int* horspool_match (char* text, int index_array, int txt_end, char* pattern, in
 */ 
 int* create_shifts (char* pattern)
 {
-    // Offset for first ASCII character
-    // const int ASCII_OFF = 32;
-
-    // Line break ASCII value
-    const char LINE_BREAK = '\n';
-
-    // Printable ASCII chars are 32-126 inclusive, line break is 10
-    const int TABLE_SIZ = 126;
 
     int length = strlen(pattern);
-    int* shift_table = (int*) malloc (sizeof(int) * TABLE_SIZ);
+    int* shift_table = (int*) malloc (sizeof(int) * length);
 
-    for(int i = 0; i < TABLE_SIZ; i++) {
+    for(int i = 0; i < length; i++) {
         // set all entries to longest shift (pattern length)
         shift_table[i] = length;
     }
-    for(int j = 0; j < length - 1; j++) {
-        // set pattern characters to shortest shifts
-        shift_table[pattern[j]] = length - 1 - j;
-    }
-
-    // assign shift of 1 for line breaks
-    shift_table[LINE_BREAK] = 1;
+	int decrement = 1;
+	for (int i = 0; i < length - 1; i++) {
+		shift_table[i] -= decrement;
+		decrement++;
+	}
 
     return shift_table;
 }

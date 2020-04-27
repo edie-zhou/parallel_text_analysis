@@ -25,12 +25,16 @@ public:
 	~Input();
 
 	vector<string_chunk> getChunks() const { return chunks; }
-	char** getArrayStrings() const { return cStyleArrStrings; }
+	char** getFullText() const { return cStyleArrStrings; }
+	char* flattenText();
 
 private:
 
+	bool flattenedTextBool;
+
 	const char* filename;
 	char** cStyleArrStrings;
+	char* flattenedText;
 
 	//used when allocating data for GPU
 	int stringCount;
@@ -38,7 +42,7 @@ private:
 	vector<int> globalIndices;			//array of new line indices for entire string
 
 	void splitOnChars();
-	char** array_from_chunk_vector();
+	void array_from_chunk_vector();
 
 	void clean();
 
