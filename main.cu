@@ -18,7 +18,7 @@ int get_line_end (char* text, int idx, int pattern_len);
 void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int* map, int* lineData, int num_chunks, int text_size);
+    int* map, int* lineData, int num_chunks, int text_size, int pat_len);
 
 
 using namespace std;
@@ -90,7 +90,8 @@ int main(int argc, char* argv[])
     time(&start); 
 
 	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
-																d_map, d_lineData, inputObj.getChunks().size(), strlen(flatText));
+                                                                d_map, d_lineData, inputObj.getChunks().size(), strlen(flatText),
+                                                              strlen(d_testPattern));
     cudaDeviceSynchronize();
     time(&end); 
   
