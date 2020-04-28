@@ -32,7 +32,7 @@ char* Input::flattenText() {
 			flattenedText[CHUNK_SIZE * row + col] = cStyleArrStrings[row][col];
 		}
 	}
-	flattenedText[(chunks.size() * CHUNK_SIZE) + 1] = '/0';
+	flattenedText[chunks.size() * CHUNK_SIZE] = '/0';
 	flattenedTextBool = true;
 	return flattenedText;
 }
