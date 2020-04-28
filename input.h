@@ -24,17 +24,25 @@ public:
 	Input(const char* fname);
 	~Input();
 
-	vector<string_chunk> getChunks() const { return chunks; }
 	char** getFullText() const { return cStyleArrStrings; }
 	char* flattenText();
+
+	vector<string_chunk> getChunks() const { return chunks; }
+	int* getMap() const { return map; }
+	int* getLineData() const { return lineData; }
 
 private:
 
 	bool flattenedTextBool;
 
+	int numLineBreaks;
+
 	const char* filename;
 	char** cStyleArrStrings;
 	char* flattenedText;
+
+	int* map;
+	int* lineData;
 
 	//used when allocating data for GPU
 	int stringCount;
@@ -43,6 +51,8 @@ private:
 
 	void splitOnChars();
 	void array_from_chunk_vector();
+
+	void createLineData();
 
 	void clean();
 
