@@ -6,14 +6,14 @@ using namespace std;
 
 Input::Input() {
 	filename = "sample-texts/J. K. Rowling - Harry Potter 3 - Prisoner of Azkaban.txt";
-	flattenedText = false;
+	flattenedTextBool = false;
 	numLineBreaks = 0;
 	splitOnChars();
 }
 
 Input::Input(const char* fname) {
 	filename = fname;
-	flattenedText = false;
+	flattenedTextBool = false;
 	numLineBreaks = 0;
 	splitOnChars();
 }
@@ -23,12 +23,16 @@ Input::~Input() {
 }
 
 char* Input::flattenText() {
-	flattenedText = (char*)malloc(chunks.size() * CHUNK_SIZE * sizeof(char));
-	for (int row = 0; row < chunks.size(); row++) {
-		for (int col = 0; col < CHUNK_SIZE; col++) {
+	flattenedText = (char*)malloc((chunks.size() * CHUNK_SIZE * sizeof(char)) + 1);
+	int row;
+	int col;
+	for (row = 0; row < chunks.size(); row++)
+	{
+		for (col = 0; col < CHUNK_SIZE; col++) {
 			flattenedText[CHUNK_SIZE * row + col] = cStyleArrStrings[row][col];
 		}
 	}
+	flattenedText[(chunks.size() * CHUNK_SIZE) + 1] = '/0';
 	flattenedTextBool = true;
 	return flattenedText;
 }
@@ -61,6 +65,7 @@ void Input::splitOnChars() {
 		chunks.push_back(chunk);
 	}
 	array_from_chunk_vector();
+	createLineData();
 	return;
 }
 
@@ -74,8 +79,10 @@ void Input::array_from_chunk_vector() {
 
 void Input::createLineData() {
 	int dataPerNewline = 2;
-	lineData = (int*)malloc((chunks.size() + (numLineBreaks * dataPerNewline)) * sizeof(int));
-	map = (int*)malloc(chunks.size() * sizeof(int));
+	lineDataSize = (chunks.size() + (numLineBreaks * dataPerNewline)) * sizeof(int);
+	lineData = (int *)malloc(lineDataSize);
+	mapSize = chunks.size() * sizeof(int);
+	map = (int *)malloc(mapSize);
 
 	int arrIdx = 0;
 	for (int i = 0; i < chunks.size(); i++) {
@@ -99,5 +106,6 @@ void Input::clean() {
 	free(cStyleArrStrings);
 	if (flattenedTextBool) free(flattenedText);
 	free(lineData);
+	free(map);
 	return;
 }

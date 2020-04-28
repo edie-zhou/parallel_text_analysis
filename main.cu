@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <iostream>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -11,41 +12,29 @@
 
 #define NUM_THREADS_PER_BLOCK 512
 
-__global__ void horspool_match(char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size) {
-	if (blockIdx.x == 0 && threadIdx.x == 0) {
-		*num_matches = 0;
-	}
-}
+int* create_shifts (char* pattern);
+int get_line_start (char* text, int idx);
+int get_line_end (char* text, int idx, int pattern_len);
+void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
+
+__global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+    int* map, int* lineData, int num_chunks, int text_size);
+
 
 using namespace std;
-
-const int ASCII_OFF = 32;
-const int chunkSize = 512;
 
 long * calcIndexes(long num_strings, long length){
     long * indexArray = ( long *)malloc(sizeof( long) * (num_strings+2));
 
     long i;
     long sum ;
-   for (sum=0, i=0; i < num_strings; i++, sum+=chunkSize){
+   for (sum=0, i=0; i < num_strings; i++, sum+=CHUNK_SIZE){
        indexArray[i] = sum;
    }
-   indexArray[i] = sum + (length - ((num_strings-1) * chunkSize));
+   indexArray[i] = sum + (length - ((num_strings-1) * CHUNK_SIZE));
    indexArray[++i] = NULL;
    return indexArray;
 }
-
-/**
- *  algo.c
- *  Single thread implementation of boyer-moore
- */
-
-/*int* horspool_match (char* text, int txt_start, int txt_end, char* pattern, int pat_len,
-int* skip, int* num_matches);*/
-int* create_shifts (char* pattern);
-int get_line_start (char* text, int idx);
-int get_line_end (char* text, int idx, int pattern_len);
-void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
 
 int determineNumBlocks(vector<string_chunk> chunks) {
 	int numBlocks = 0;
@@ -65,31 +54,54 @@ int main(int argc, char* argv[])
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
+	int* map = inputObj.getMap();
+	int* lineData = inputObj.getLineData();
+
 	int fullTextSize = inputObj.getChunks().size() * CHUNK_SIZE * sizeof(char);
 	int patternSize = strlen(testPattern) * sizeof(char);
 	int skipTableSize = strlen(testPattern) * sizeof(int);
+	int mapSize = inputObj.getMapSize();
+	int lineDataSize = inputObj.getLineDataSize();
 
 	char* d_fullText;
 	char* d_testPattern;
 	int* d_skipTable;
 	unsigned int* d_numMatches;
+	int* d_map;
+	int* d_lineData;
 
 	cudaMalloc((void**)& d_fullText, fullTextSize);
 	cudaMalloc((void**)& d_testPattern, patternSize);
 	cudaMalloc((void**)& d_skipTable, skipTableSize);
 	cudaMalloc((void**)& d_numMatches, sizeof(unsigned int));
+	cudaMalloc((void**)& d_map, mapSize);
+	cudaMalloc((void**)& d_lineData, lineDataSize);
 
 	cudaMemcpy(d_fullText, flatText, fullTextSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_testPattern, testPattern, patternSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_skipTable, skipTable, skipTableSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_numMatches, numMatches, sizeof(unsigned int), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_map, map, mapSize, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_lineData, lineData, lineDataSize, cudaMemcpyHostToDevice);
 
-	int numBlocks = determineNumBlocks(inputObj.getChunks());
-	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE);
+    int numBlocks = determineNumBlocks(inputObj.getChunks());
+    time_t start, end = 0; 
+    cudaDeviceSynchronize();
+    time(&start); 
+
+	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
+																d_map, d_lineData, inputObj.getChunks().size(), strlen(flatText));
+    cudaDeviceSynchronize();
+    time(&end); 
+  
+    // Calculating total time taken by the program. 
+    double time_taken = double(end - start); 
+    cout << "Time taken by program is : " << fixed 
+         << time_taken; 
 
 	cudaMemcpy(numMatches, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 	
-	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches);
+	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches); cudaFree(d_map); cudaFree(d_lineData);
 	
 	cout << "Number of Matches: " << *numMatches << endl;
 
@@ -124,90 +136,114 @@ int main(int argc, char* argv[])
     return 0;
 }
 
+
 /**
-*  Purpose:
-*    Boyer-Moore-Horspool pattern matching algorithm implementation
-* 
-*  Args:
-*    text        {char*}: text c-string 
-*    index_array  {int*}: Array of integer offsets in text
-*    pattern     {char*}: desired pattern c-string
-*    pat_len       {int}: pattern c-string length
-*    skip         {int*}: skip table
-*    num_matches {char*}: Pointer to number of matches found
-*    d_out        {int*}: Output array of found pattern indices
-* 
-*  Returns:
-*    {int*}: 
-*/ 
-/*int* horspool_match (char* text, int index_array, int txt_end, char* pattern, int pat_len,
-    int* skip, int* num_matches, int* d_out)
-{
-    int* result = (int*) malloc(0);
-    int idx = 0;
-    int size = 0;
+ *  Purpose:
+ *    Boyer-Moore-Horspool pattern matching algorithm implementation
+ * 
+ *  Args:
+ *    text        {char*}: Text c-string - still text
+ *    pattern     {char*}: Target c-string - still pattern
+ *    shift_table  {int*}: Skip table - shift table
+ *    num_matches   {int}: Total match count - num_matches
+ *    chunk_size    {int}: Length of chunk size
+ *    map          {int*}:
+ *    lineData     {int*}:
+ *    num_chunks    {int}: Total number of chunks
+ *    text_size     {int}: Integer text length
+ *    pat_len       {int}: Integer pattern length
+ *  Returns:
+ *    None
+ */ 
+ 
+ /* lineData data structure
+struct line_break_entry {
+	int line_break_index;
+	int line_break_number;
+}
+
+struct data_point {
+	int num entries;
+	line_break_entry[num_entries];
+}
+*/
+
+ __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+    int* map, int* lineData, int num_chunks, int text_size, int pat_len) {
+
+    int count = 0;
 
     int myId = threadIdx.x + blockDim.x * blockIdx.x;
-    if(myId > num_strings[0]){
+    if(myId > num_chunks){ //if thread is an invalid thread
         return;
     }
-
-    int text_length = index_array[myId + 1];
-
+    int lineDataIdx = map[myId];
+    int num_entries = lineData[lineDataIdx];
+    int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
+    
     // don't need to check first pattern_length - 1 characters
-    int i = index_array[myId] + pat_len - 1;
+    int i = (myId*chunk_size) + pat_len - 1;
     int k = 0;
     while(i < text_length) {
         // reset matched character count
         k = 0;
+
+        if (i >= text_size) {
+        // break out if i tries to step past text length
+            break;
+        }
+
         while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
-            // increment matched character count
+        // increment matched character count
             k++;
         }
         if(k == pat_len) {
-            // store result index, rellocate result array
-            size = ((idx) * sizeof(int)) + sizeof(int);
-            result = (int*) realloc(result, size);
-            result[idx] = i - pat_len + 1;
-            
-            // number of matches found, increment result index, increment text index
-            ++idx;
+        // increment pattern count, text index
+            ++count;
             ++i;
-        
+
         } else {
-            i = i + skip[text[i]];
+            i = i + shift_table[text[i]];
         }
     }
 
-    // Add to number of matches found
-    *num_matches += idx;
-    d_out = result;
-//    return result;
-	return NULL;
-}*/
+    // Add count to total matches atomically
+    atomicAdd(num_matches, count);
+
+}
+
 
 /**
-*  Purpose:
-*    Create shift table for Boyer-Moore-Horspool algorithm
-*  
-*  Args:
-*    pattern {char*}: desired pattern c-string
-*/ 
+ *  Purpose:
+ *    Create shift table for Boyer-Moore-Horspool algorithm
+ *  
+ *  Args:
+ *    pattern {char*}: desired pattern c-string
+ */ 
 int* create_shifts (char* pattern)
 {
+    // Offset for first ASCII character
+
+    // Line break ASCII value
+    const char LINE_BREAK = '\n';
+
+    // Printable ASCII chars are 32-126 inclusive, line break is 10
+    const int TABLE_SIZ = 126;
 
     int length = strlen(pattern);
-    int* shift_table = (int*) malloc (sizeof(int) * length);
+    int* shift_table = (int*) malloc (sizeof(int) * TABLE_SIZ);
 
-    for(int i = 0; i < length; i++) {
+    for(int i = 0; i < TABLE_SIZ; i++) {
         // set all entries to longest shift (pattern length)
         shift_table[i] = length;
     }
-	int decrement = 1;
-	for (int i = 0; i < length - 1; i++) {
-		shift_table[i] -= decrement;
-		decrement++;
-	}
+    for(int j = 0; j < length - 1; j++) {
+        // set pattern characters to shortest shifts
+        shift_table[pattern[j]] = length - 1 - j;
+    }
+
+    // assign shift of 1 for line breaks
+    shift_table[LINE_BREAK] = 1;
 
     return shift_table;
 }

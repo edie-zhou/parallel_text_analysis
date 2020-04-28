@@ -30,12 +30,16 @@ public:
 	vector<string_chunk> getChunks() const { return chunks; }
 	int* getMap() const { return map; }
 	int* getLineData() const { return lineData; }
+	int getMapSize() const { return mapSize; }
+	int getLineDataSize() const { return lineDataSize; }
 
 private:
 
 	bool flattenedTextBool;
 
 	int numLineBreaks;
+	int mapSize;
+	int lineDataSize;
 
 	const char* filename;
 	char** cStyleArrStrings;
