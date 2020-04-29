@@ -26,7 +26,6 @@ Input::~Input() {
 
 char* Input::flattenText() {
 	flattenedText = (char*)malloc((textSize + 1) * sizeof(char));
-	cout << textSize << endl;
 	int count = 0;
 	int row;
 	int col;
@@ -39,7 +38,6 @@ char* Input::flattenText() {
 			}
 		}
 	}
-	cout << count << endl;
 	flattenedText[textSize] = '\0';
 	flattenedTextBool = true;
 	return flattenedText;

@@ -18,7 +18,7 @@ int get_line_end (char* text, int idx, int pattern_len);
 void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int* map, int* lineData, int num_chunks, int text_size, int pat_length);
+    int* map, int* lineData, int num_chunks, int text_size, int pat_len);
 
 
 using namespace std;
@@ -49,7 +49,6 @@ int main(int argc, char* argv[])
 	Input inputObj("sample-texts/small.txt");
 
 	char* flatText = inputObj.flattenText();
-	cout << flatText;
 	char* testPattern = (char*)malloc(5 * sizeof(char));
 	testPattern = strcpy(testPattern, "test");
     int* skipTable = create_shifts(testPattern);
@@ -58,8 +57,8 @@ int main(int argc, char* argv[])
 	int* map = inputObj.getMap();
 	int* lineData = inputObj.getLineData();
 
-	int fullTextSize = inputObj.getTextSize();
-	int patternSize = strlen(testPattern) * sizeof(char);
+	int fullTextSize = (inputObj.getTextSize() + 1) * sizeof(char);
+	int patternSize = (strlen(testPattern) + 1) * sizeof(char);
 	int skipTableSize = strlen(testPattern) * sizeof(int);
 	int mapSize = inputObj.getMapSize();
 	int lineDataSize = inputObj.getLineDataSize();
@@ -92,7 +91,7 @@ int main(int argc, char* argv[])
 	cout << "num blocks: " << numBlocks << endl;
 
 	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
-															d_map, d_lineData, inputObj.getChunks().size(), strlen(flatText), strlen(testPattern));
+															d_map, d_lineData, inputObj.getChunks().size(), inputObj.getTextSize(), strlen(testPattern));
     cudaDeviceSynchronize();
     time(&end); 
   
