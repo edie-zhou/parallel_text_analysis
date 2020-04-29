@@ -66,7 +66,7 @@ void Input::splitOnChars() {
 				numLineBreaks++;
 				globalIndices.push_back(chunks.size() * CHUNK_SIZE + count);
 				chunk.newLineIndices.push_back(count);
-				chunk.newLineIndices.push_back(globalIndices.size());
+				chunk.lineNumbers.push_back(globalIndices.size());
 			}
 		}
 		stringCount++;
@@ -74,6 +74,17 @@ void Input::splitOnChars() {
 	}
 	array_from_chunk_vector();
 	createLineData();
+	int skip = 0;
+	for (int i = 0; i < chunks.size(); i++) {
+		cout << "num entries: " << lineData[skip] << " ";
+		int offset = 0;
+		for (int j = 0; j < lineData[skip]; j++) {
+			cout << "entry " << j << ": " << "(" << lineData[skip + offset + 1] << "," << lineData[skip + offset + 2] << ") ";
+			offset = offset + 2;
+		}
+		cout << endl;
+		skip = skip + (1 + (lineData[skip] * 2));
+	}
 	return;
 }
 

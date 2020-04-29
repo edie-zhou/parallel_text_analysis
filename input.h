@@ -7,8 +7,8 @@
 #include <iostream>
 #include <vector>
 
-#define CHUNK_SIZE 512
-//#define CHUNK_SIZE 6
+//#define CHUNK_SIZE 512
+#define CHUNK_SIZE 6
 
 using namespace std;
 struct string_chunk {
