@@ -49,19 +49,28 @@ void Input::splitOnChars() {
 	fptr = fopen(filename, "r");
 	char ch;
 	while ((ch = fgetc(fptr)) != EOF) {
+		int count = 0;
 		string_chunk chunk;
 		chunk.str = (char*)malloc(CHUNK_SIZE * sizeof(char));
-		chunk.str[0] = ch;
-		textSize++;
+		if ((((int)ch >= 0) && ((int)ch <= 126)) || (ch == '\n')) {
+			chunk.str[0] = ch;
+			textSize++;
+			count++;
+		}
 		if (ch == '\n') {
 			numLineBreaks++;
 			globalIndices.push_back(chunks.size() * CHUNK_SIZE);
 			chunk.newLineIndices.push_back(0);
 			chunk.lineNumbers.push_back(globalIndices.size());
 		}
-		for (int count = 1; (count < CHUNK_SIZE && (ch = fgetc(fptr)) != EOF); count++) {
-			chunk.str[count] = ch;
-			textSize++;
+		for (; (count < CHUNK_SIZE && (ch = fgetc(fptr)) != EOF); count++) {
+			if ((((int)ch >= 0) && ((int)ch <= 126)) || (ch == '\n')) {
+				chunk.str[count] = ch;
+				textSize++;
+			}
+			else {
+				count--;
+			}
 			if (ch == '\n') {
 				numLineBreaks++;
 				globalIndices.push_back(chunks.size() * CHUNK_SIZE + count);

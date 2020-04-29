@@ -46,11 +46,11 @@ int determineNumBlocks(vector<string_chunk> chunks) {
 
 int main(int argc, char* argv[])
 {
-	Input inputObj;
+	Input inputObj("sample-texts/Bible_KJV.txt");
 
 	char* flatText = inputObj.flattenText();
-	char* testPattern = (char*)malloc(6 * sizeof(char));
-	testPattern = strcpy(testPattern, "Harry");
+	char* testPattern = (char*)malloc(4 * sizeof(char));
+	testPattern = strcpy(testPattern, "him");
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
@@ -88,7 +88,6 @@ int main(int argc, char* argv[])
     time_t start, end = 0; 
     cudaDeviceSynchronize();
     time(&start); 
-	cout << "num blocks: " << numBlocks << endl;
 
 	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
 															d_map, d_lineData, inputObj.getChunks().size(), inputObj.getTextSize(), strlen(testPattern));
@@ -206,7 +205,7 @@ struct data_point {
         } else {
             i = i + shift_table[text[i]];
         }
-		//if (myId == 0) {
+		// if (myId == 0) {
 			//printf("i: %d\n", i);
 		//}
     }
