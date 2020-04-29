@@ -46,7 +46,7 @@ int determineNumBlocks(vector<string_chunk> chunks) {
 
 int main(int argc, char* argv[])
 {
-	Input inputObj("sample-texts/small.txt");
+	Input inputObj;
 
 	char* flatText = inputObj.flattenText();
 	char* testPattern = (char*)malloc(5 * sizeof(char));
