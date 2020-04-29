@@ -56,7 +56,8 @@ int main(int argc, char* argv[])
 
 	char* flatText = inputObj.flattenText();
 	char* testPattern = (char*)malloc(5 * sizeof(char));
-	testPattern = strcpy(testPattern, "test");
+    testPattern = strcpy(testPattern, "test");
+    testPattern[4] = '\0';
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
@@ -140,7 +141,7 @@ int main(int argc, char* argv[])
     for(int i = 0; i < numBlocks-1; i++){
         answer += output[i];
     }
-    cout << "Number of Matches: " << answer << endl;
+    cout << "Number of Matches: " << *numMatches << endl;
 
 
 	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches); cudaFree(d_map); cudaFree(d_lineData);
@@ -284,7 +285,8 @@ struct data_point {
             i = i + shift_table[text[i]];
         }
     }
-    s[threadIdx.x] = count;
+    atomicAdd(num_matches, count);
+    /*s[threadIdx.x] = count;
     __syncthreads();
     // Add count to total matches atomically
     if (threadIdx.x == 0 ){
@@ -294,6 +296,7 @@ struct data_point {
         }
         d_output[blockIdx.x] = sum;
     }
+    */
     
 
 }
