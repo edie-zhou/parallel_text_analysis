@@ -7,7 +7,8 @@
 #include <iostream>
 #include <vector>
 
-#define CHUNK_SIZE 512
+//#define CHUNK_SIZE 512
+#define CHUNK_SIZE 6
 
 using namespace std;
 struct string_chunk {
@@ -30,12 +31,15 @@ public:
 	vector<string_chunk> getChunks() const { return chunks; }
 	int* getMap() const { return map; }
 	int* getLineData() const { return lineData; }
+
+	int getTextSize() const { return textSize; }
 	int getMapSize() const { return mapSize; }
 	int getLineDataSize() const { return lineDataSize; }
 
 private:
 
 	bool flattenedTextBool;
+	int textSize;
 
 	int numLineBreaks;
 	int mapSize;

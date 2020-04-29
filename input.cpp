@@ -8,6 +8,7 @@ Input::Input() {
 	filename = "sample-texts/J. K. Rowling - Harry Potter 3 - Prisoner of Azkaban.txt";
 	flattenedTextBool = false;
 	numLineBreaks = 0;
+	textSize = 0;
 	splitOnChars();
 }
 
@@ -15,6 +16,7 @@ Input::Input(const char* fname) {
 	filename = fname;
 	flattenedTextBool = false;
 	numLineBreaks = 0;
+	textSize = 0;
 	splitOnChars();
 }
 
@@ -23,16 +25,22 @@ Input::~Input() {
 }
 
 char* Input::flattenText() {
-	flattenedText = (char*)malloc((chunks.size() * CHUNK_SIZE * sizeof(char)) + 1);
+	flattenedText = (char*)malloc((textSize + 1) * sizeof(char));
+	cout << textSize << endl;
+	int count = 0;
 	int row;
 	int col;
 	for (row = 0; row < chunks.size(); row++)
 	{
 		for (col = 0; col < CHUNK_SIZE; col++) {
-			flattenedText[CHUNK_SIZE * row + col] = cStyleArrStrings[row][col];
+			if (CHUNK_SIZE * row + col < textSize) {
+				count++;
+				flattenedText[CHUNK_SIZE * row + col] = cStyleArrStrings[row][col];
+			}
 		}
 	}
-	flattenedText[chunks.size() * CHUNK_SIZE] = '/0';
+	cout << count << endl;
+	flattenedText[textSize] = '\0';
 	flattenedTextBool = true;
 	return flattenedText;
 }
@@ -44,8 +52,9 @@ void Input::splitOnChars() {
 	char ch;
 	while ((ch = fgetc(fptr)) != EOF) {
 		string_chunk chunk;
-		chunk.str = (char*)malloc(512 * sizeof(char));
+		chunk.str = (char*)malloc(CHUNK_SIZE * sizeof(char));
 		chunk.str[0] = ch;
+		textSize++;
 		if (ch == '\n') {
 			numLineBreaks++;
 			globalIndices.push_back(chunks.size() * CHUNK_SIZE);
@@ -54,6 +63,7 @@ void Input::splitOnChars() {
 		}
 		for (int count = 1; (count < CHUNK_SIZE && (ch = fgetc(fptr)) != EOF); count++) {
 			chunk.str[count] = ch;
+			textSize++;
 			if (ch == '\n') {
 				numLineBreaks++;
 				globalIndices.push_back(chunks.size() * CHUNK_SIZE + count);
