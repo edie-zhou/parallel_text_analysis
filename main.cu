@@ -49,8 +49,8 @@ int main(int argc, char* argv[])
 	Input inputObj;
 
 	char* flatText = inputObj.flattenText();
-	char* testPattern = (char*)malloc(5 * sizeof(char));
-	testPattern = strcpy(testPattern, "test");
+	char* testPattern = (char*)malloc(6 * sizeof(char));
+	testPattern = strcpy(testPattern, "Harry");
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 
 	int fullTextSize = (inputObj.getTextSize() + 1) * sizeof(char);
 	int patternSize = (strlen(testPattern) + 1) * sizeof(char);
-	int skipTableSize = strlen(testPattern) * sizeof(int);
+	int skipTableSize = 126 * sizeof(int);
 	int mapSize = inputObj.getMapSize();
 	int lineDataSize = inputObj.getLineDataSize();
 
@@ -206,6 +206,9 @@ struct data_point {
         } else {
             i = i + shift_table[text[i]];
         }
+		//if (myId == 0) {
+			//printf("i: %d\n", i);
+		//}
     }
 
     // Add count to total matches atomically
