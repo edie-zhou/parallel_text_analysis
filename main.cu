@@ -109,12 +109,14 @@ int main(int argc, char* argv[])
 
     // Calculating total time taken by the program. 
     double time_taken = double(end - start)/ CLOCKS_PER_SEC; 
-    cout << "Time taken by parallel program is: " << setprecision(9) << time_taken << endl;
-    cout << "Number of exact matches of found by parallel program: " << *parallel_result << endl;
+    cout << "Time taken by parallel program: " << setprecision(9) << time_taken << endl;
+    cout << "There are " << *parallel_result << " exact matches to string `" << argv[1] << "`" << 
+        endl << "found by parallel program in file `" << argv[2] <<"`"<< endl << endl;
 
     time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
-    cout << "Time taken by linear program is: " << setprecision(9) << time_taken << endl; 
-    cout << "Number of matches found by linear program: " << result << endl;
+    cout << "Time taken by linear program: " << setprecision(9) << time_taken << endl; 
+    cout << "There are " << result << " exact matches to string `" << argv[1] << "`" <<
+        endl << "found by linear program in file `" << argv[2] <<"`"<< endl;
 
     cudaFree(d_fullText);
     cudaFree(d_testPattern);
