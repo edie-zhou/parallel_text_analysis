@@ -18,11 +18,11 @@ int* create_shifts (char* pattern);
 
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int* map, int* lineData, int num_chunks, int text_size, int pat_len, unsigned int* d_output);
+    int num_chunks, int text_size, int pat_len, unsigned int* d_output);
 __global__ void prescan(int *g_odata, int *g_idata, int n);
 
 int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-        int* map, int* lineData, int num_chunks, int text_size, int pat_len, int myId) ;
+        int num_chunks, int text_size, int pat_len, int myId) ;
 
 void sum_scan_blelloch(unsigned int* d_out, unsigned int* d_in, size_t numElems);
 __global__ void gpu_add_block_sums(unsigned int* d_out, unsigned int* d_in, unsigned int* d_block_sums,
@@ -65,37 +65,26 @@ int main(int argc, char* argv[])
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
-	int* map = inputObj.getMap();
-	int* lineData = inputObj.getLineData();
 
 	int fullTextSize = inputObj.getChunks().size() * CHUNK_SIZE * sizeof(char);
 	int patternSize = strlen(testPattern) * sizeof(char);
 	int skipTableSize = 126 * sizeof(int);
-	int mapSize = inputObj.getMapSize();
-    int lineDataSize = inputObj.getLineDataSize();
 
 	char* d_fullText;
 	char* d_testPattern;
 	int* d_skipTable;
 	unsigned int* d_numMatches;
-	int* d_map;
-	int* d_lineData;
     unsigned int* d_output;
 
 	cudaMalloc((void**)& d_fullText, fullTextSize);
 	cudaMalloc((void**)& d_testPattern, patternSize);
 	cudaMalloc((void**)& d_skipTable, skipTableSize);
 	cudaMalloc((void**)& d_numMatches, sizeof(unsigned int));
-	cudaMalloc((void**)& d_map, mapSize);
-    cudaMalloc((void**)& d_lineData, lineDataSize);
-
 
 	cudaMemcpy(d_fullText, flatText, fullTextSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_testPattern, testPattern, patternSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_skipTable, skipTable, skipTableSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_numMatches, numMatches, sizeof(unsigned int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_map, map, mapSize, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_lineData, lineData, lineDataSize, cudaMemcpyHostToDevice);
 
     int numBlocks = determineNumBlocks(inputObj.getChunks());
     cudaMalloc((void**)& d_output, numBlocks * sizeof(unsigned int));
@@ -115,7 +104,7 @@ int main(int argc, char* argv[])
     start = clock();
 
 	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK, NUM_THREADS_PER_BLOCK * sizeof(int) >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
-        d_map, d_lineData, num_chunks , text_len, pat_len, d_output);
+        num_chunks , text_len, pat_len, d_output);
         cudaDeviceSynchronize();
     
     unsigned int* d_result;
@@ -137,7 +126,7 @@ int main(int argc, char* argv[])
     unsigned int result = 0;
     for(int myId =0; myId < numBlocks * NUM_THREADS_PER_BLOCK; myId++){
         result += linear_horspool_match(flatText, testPattern, skipTable, numMatches, CHUNK_SIZE, 
-            map, lineData, num_chunks , text_len, pat_len, myId);    
+            num_chunks , text_len, pat_len, myId);    
     }
     end1 = clock();
     //cout << "result is " << result << endl;
@@ -160,7 +149,7 @@ int main(int argc, char* argv[])
     cout << "Number of Matches: " << *numMatches << endl;
 
 
-	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches); cudaFree(d_map); cudaFree(d_lineData);
+	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches);
 	
 
 	free(testPattern);
@@ -169,7 +158,7 @@ int main(int argc, char* argv[])
 }
 
 int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int* map, int* lineData, int num_chunks, int text_size, int pat_len, int myId) {
+    int num_chunks, int text_size, int pat_len, int myId) {
 
         int count = 0;
         int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
@@ -215,8 +204,6 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
  *    shift_table  {int*}: Skip table - shift table
  *    num_matches   {int}: Total match count - num_matches
  *    chunk_size    {int}: Length of chunk size
- *    map          {int*}:
- *    lineData     {int*}:
  *    num_chunks    {int}: Total number of chunks
  *    text_size     {int}: Integer text length
  *    pat_len       {int}: Integer pattern length
@@ -226,7 +213,7 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
  
 
  __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int* map, int* lineData, int num_chunks, int text_size, int pat_len , unsigned int* d_output) {
+    int num_chunks, int text_size, int pat_len , unsigned int* d_output) {
     extern __shared__ int s[];
 
 
