@@ -141,9 +141,9 @@ int main(int argc, char* argv[])
         endl << "found by parallel program in file `" << argv[2] <<"`"<< endl << endl;
 
     time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
-    cout << "Time taken by linear program: " << setprecision(9) << time_taken << endl; 
+    /*cout << "Time taken by linear program: " << setprecision(9) << time_taken << endl; 
     cout << "There are " << result << " exact matches to string `" << argv[1] << "`" <<
-        endl << "found by linear program in file `" << argv[2] <<"`"<< endl;
+        endl << "found by linear program in file `" << argv[2] <<"`"<< endl;*/
 
     cudaFree(d_fullText);
     cudaFree(d_testPattern);
