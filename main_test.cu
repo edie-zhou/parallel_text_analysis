@@ -12,26 +12,26 @@
 
 #include "input.h"
 
+using namespace std;
+
 #define NUM_THREADS_PER_BLOCK 512
 
 int* create_shifts (char* pattern);
 
+int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+    int num_chunks, int text_size, int pat_len, int myId);
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int num_chunks, int text_size, int pat_len, unsigned int* d_output);
 __global__ void prescan(int *g_odata, int *g_idata, int n);
 
-int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-        int num_chunks, int text_size, int pat_len, int myId) ;
-
 void sum_scan_blelloch(unsigned int* d_out, unsigned int* d_in, size_t numElems);
+__global__ void gpu_prescan(unsigned int* d_out, unsigned int* d_in, unsigned int* d_block_sums,
+    unsigned int len, unsigned int shmem_sz, unsigned int max_elems_per_block);
 __global__ void gpu_add_block_sums(unsigned int* d_out, unsigned int* d_in, unsigned int* d_block_sums,
     size_t numElems);
 
-__global__ void gpu_prescan(unsigned int* d_out, unsigned int* d_in, unsigned int* d_block_sums,
-    unsigned int len, unsigned int shmem_sz, unsigned int max_elems_per_block);
 
-using namespace std;
 
 int determineNumBlocks(vector<string_chunk> chunks) {
 	int numBlocks = 0;
