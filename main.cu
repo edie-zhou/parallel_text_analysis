@@ -1,4 +1,4 @@
-#pragma once
+// #pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,38 +6,25 @@
 #include <time.h>
 #include <iostream>
 #include "cuda_runtime.h"
+#include <iomanip>      // std::setprecision
+
 #include "device_launch_parameters.h"
 #include <iomanip>
 
 #include "input.h"
 
+using namespace std;
+
 #define NUM_THREADS_PER_BLOCK 512
 
 int* create_shifts (char* pattern);
-int get_line_start (char* text, int idx);
-int get_line_end (char* text, int idx, int pattern_len);
-void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
+
+int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+    int num_chunks, int text_size, int pat_len, int myId);
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int* map, int* lineData, int num_chunks, int text_size, int pat_len);
-int linear_horspool_match(char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-	int* map, int* lineData, int num_chunks, int text_size, int pat_len, int myId);
-
-
-using namespace std;
-
-long * calcIndexes(long num_strings, long length){
-    long * indexArray = ( long *)malloc(sizeof( long) * (num_strings+2));
-
-    long i;
-    long sum ;
-   for (sum=0, i=0; i < num_strings; i++, sum+=CHUNK_SIZE){
-       indexArray[i] = sum;
-   }
-   indexArray[i] = sum + (length - ((num_strings-1) * CHUNK_SIZE));
-   indexArray[++i] = NULL;
-   return indexArray;
-}
+    int num_chunks, int text_size, int pat_len);
+__global__ void prescan(int *g_odata, int *g_idata, int n);
 
 int determineNumBlocks(vector<string_chunk> chunks) {
 	int numBlocks = 0;
@@ -47,110 +34,155 @@ int determineNumBlocks(vector<string_chunk> chunks) {
 	return numBlocks;
 }
 
+/*
+ *  Driver function
+ *  argv[0] is target pattern string
+ *  argv[1] is text path
+ */
 int main(int argc, char* argv[])
 {
-	Input inputObj;
-	char* flatText = inputObj.flattenText();
-	char* testPattern = (char*)malloc(4 * sizeof(char));
-	testPattern = strcpy(testPattern, "him");
+    const int TABLE_SIZ = 126;
+
+	cout << argc << endl;
+	for (int i = 0; i < argc; i++) {
+		cout << argv[i] << endl;
+	}
+    // printf("%d", argc);
+    if (argc == 2 && (strcmp(argv[1], "-h") || strcmp(argv[1], "--help"))){
+        cout << "`match.exe` finds exact matches to a target string in text files." << endl
+            << "Type ./main.exe {target_string} {text file path} to use the program." << endl
+            << "Text file paths must be relative to the directory of `main.exe`." << endl;
+        exit(0);
+    }
+	else if (argc != 3) {
+        cout << "ERROR: Please pass in a target string and a file path." << endl;
+        exit(-1);
+    }
+
+	Input inputObj(argv[2]);
+    char* flatText = inputObj.flattenText();
+
+    int input_len = strlen(argv[1]);
+	char* testPattern = (char*)malloc(input_len * sizeof(char) + 1);
+    testPattern = strcpy(testPattern, argv[1]);
+    testPattern[input_len] = '\0';
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
-	int* map = inputObj.getMap();
-	int* lineData = inputObj.getLineData();
 
-	int fullTextSize = (inputObj.getTextSize() + 1) * sizeof(char);
-	int patternSize = (strlen(testPattern) + 1) * sizeof(char);
-	int skipTableSize = 126 * sizeof(int);
-	int mapSize = inputObj.getMapSize();
-	int lineDataSize = inputObj.getLineDataSize();
+	int fullTextSize = inputObj.getChunks().size() * CHUNK_SIZE * sizeof(char);
+	int patternSize = strlen(testPattern) * sizeof(char);
+	int skipTableSize = TABLE_SIZ * sizeof(int);
 
 	char* d_fullText;
 	char* d_testPattern;
 	int* d_skipTable;
 	unsigned int* d_numMatches;
-	int* d_map;
-	int* d_lineData;
+    unsigned int* parallel_result = (unsigned int*) malloc(sizeof(unsigned int));
 
 	cudaMalloc((void**)& d_fullText, fullTextSize);
 	cudaMalloc((void**)& d_testPattern, patternSize);
 	cudaMalloc((void**)& d_skipTable, skipTableSize);
 	cudaMalloc((void**)& d_numMatches, sizeof(unsigned int));
-	cudaMalloc((void**)& d_map, mapSize);
-	cudaMalloc((void**)& d_lineData, lineDataSize);
 
 	cudaMemcpy(d_fullText, flatText, fullTextSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_testPattern, testPattern, patternSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_skipTable, skipTable, skipTableSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_numMatches, numMatches, sizeof(unsigned int), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_map, map, mapSize, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_lineData, lineData, lineDataSize, cudaMemcpyHostToDevice);
 
+    
+    time_t start, end , start1,end1 = 0;
+    int text_len = strlen(flatText);
+    int pat_len = strlen(testPattern); 
+    int num_chunks = inputObj.getChunks().size();
     int numBlocks = determineNumBlocks(inputObj.getChunks());
-    time_t start, end = 0; 
-	time_t start_linear, end_linear = 0;
-	int text_len = strlen(flatText);
-	int pat_len = strlen(testPattern);
-	int num_chunks = inputObj.getChunks().size();
     cudaDeviceSynchronize();
-	start = clock();
 
-	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
-															d_map, d_lineData, inputObj.getChunks().size(), inputObj.getTextSize(), strlen(testPattern));
+    time(&start);   
+    start = clock();
+
+	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK, NUM_THREADS_PER_BLOCK * sizeof(int) >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
+        num_chunks, text_len, pat_len);
+        cudaDeviceSynchronize();
+    
+    cudaMemcpy(parallel_result, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+    end = clock();
+    
+
+    start1 = clock();
+    unsigned int result = 0;
+    for(int myId =0; myId < numBlocks * NUM_THREADS_PER_BLOCK; myId++){
+        result += linear_horspool_match(flatText, testPattern, skipTable, numMatches, CHUNK_SIZE, 
+            num_chunks, text_len, pat_len, myId);    
+    }
+    end1 = clock();
     cudaDeviceSynchronize();
-	end = clock();
-	start_linear = clock();
-	unsigned int result = 0;
-	for (int myId = 0; myId < numBlocks * NUM_THREADS_PER_BLOCK; myId++) {
-		result += linear_horspool_match(flatText, testPattern, skipTable, numMatches, CHUNK_SIZE,
-			map, lineData, num_chunks, text_len, pat_len, myId);
-	}
-	cout << "hello" << endl;
-	end_linear = clock();
-  
+
     // Calculating total time taken by the program. 
-	double time_taken = double(end - start) / CLOCKS_PER_SEC;
-	cout << "Time taken by parallel program is : " << setprecision(9) << time_taken << endl;
-	time_taken = double(end_linear - start_linear) / CLOCKS_PER_SEC;
-	cout << "Time taken by linear program is : " << setprecision(9) << time_taken << endl;
+    double time_taken = double(end - start)/ CLOCKS_PER_SEC; 
+    cout << "Time taken by parallel program: " << setprecision(9) << time_taken << endl;
+    cout << "There are " << *parallel_result << " exact matches to string `" << argv[1] << "`" << 
+        endl << "found by parallel program in file `" << argv[2] <<"`"<< endl << endl;
 
-	cudaMemcpy(numMatches, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
-	
-	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches); cudaFree(d_map); cudaFree(d_lineData);
-	
-	cout << "Number of Matches: " << *numMatches << endl;
+    time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
+    cout << "Time taken by linear program: " << setprecision(9) << time_taken << endl; 
+    cout << "There are " << result << " exact matches to string `" << argv[1] << "`" <<
+        endl << "found by linear program in file `" << argv[2] <<"`"<< endl;
+
+    cudaFree(d_fullText);
+    cudaFree(d_testPattern);
+    cudaFree(d_skipTable);
+    cudaFree(d_numMatches);
 
 	free(testPattern);
 	free(skipTable);
-	free(numMatches);
-
-    /*int num_matches = 0;
-    int* occ = horspool_match (test_str, 0, strlen(test_str), test_pattern, strlen(test_pattern),
-        skip, &num_matches);
-    // printf("Occurences of %s: %d\n", test_pattern, occ);
-
-    int line_start, line_end;
-    int pat_len = strlen(test_pattern);
-    printf("%d matches found!\n", num_matches);
-    for (int i = 0; i < num_matches; ++i) {
-        printf("\n");
-        // printf("Pattern found at index %d!\n", occ[i]);
-
-        // get inclusive line start
-        line_start = get_line_start(test_str, occ[i]);
-        
-        // get exclusive line end
-        line_end = get_line_end(test_str, occ[i], pat_len);
-
-        // printf("Line start: %d, end: %d\n", line_start, line_end);
-        // print line that pattern was found at
-        print_line (test_str, line_start, line_end, occ[i], pat_len);
-    }
-    printf("\n");*/
-
-    return 0;
+    free(numMatches);
 }
 
+int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+    int num_chunks, int text_size, int pat_len, int myId) {
+        
+        const int TABLE_SIZ = 126;
+
+        int count = 0;
+        int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
+    
+        // don't need to check first pattern_length - 1 characters
+        int i = (myId*chunk_size) + pat_len - 1;
+        int k = 0;
+        while(i < text_length) {
+            // reset matched character count
+            k = 0;
+    
+            if (i >= text_size) {
+            // break out if i tries to step past text length
+                break;
+            }
+
+            if (text[i] >= TABLE_SIZ || text[i] < 0) {
+                // move to next char if unknown char (Unicode, etc.)
+                ++i;
+            } else {
+                while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
+                // increment matched character count
+                    k++;
+                }
+                if(k == pat_len) {
+                // increment pattern count, text index
+                    ++count;
+                    ++i;
+        
+                } else {
+                    // add on shift if known char
+                    i = i + shift_table[text[i]];
+                }
+            }
+        }
+        return count;
+        // Add count to total matches atomically
+    
+    }
+    
 
 /**
  *  Purpose:
@@ -162,8 +194,6 @@ int main(int argc, char* argv[])
  *    shift_table  {int*}: Skip table - shift table
  *    num_matches   {int}: Total match count - num_matches
  *    chunk_size    {int}: Length of chunk size
- *    map          {int*}:
- *    lineData     {int*}:
  *    num_chunks    {int}: Total number of chunks
  *    text_size     {int}: Integer text length
  *    pat_len       {int}: Integer pattern length
@@ -171,31 +201,20 @@ int main(int argc, char* argv[])
  *    None
  */ 
  
- /* lineData data structure
-struct line_break_entry {
-	int line_break_index;
-	int line_break_number;
-}
-
-struct data_point {
-	int num entries;
-	line_break_entry[num_entries];
-}
-*/
 
  __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int* map, int* lineData, int num_chunks, int text_size, int pat_len) {
+    int num_chunks, int text_size, int pat_len) {
+    
+    const int TABLE_SIZ = 126;
 
     int count = 0;
-
     int myId = threadIdx.x + blockDim.x * blockIdx.x;
     if(myId > num_chunks){ //if thread is an invalid thread
         return;
     }
-    int lineDataIdx = map[myId];
-    int num_entries = lineData[lineDataIdx];
+
     int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
-    
+
     // don't need to check first pattern_length - 1 characters
     int i = (myId*chunk_size) + pat_len - 1;
     int k = 0;
@@ -208,26 +227,27 @@ struct data_point {
             break;
         }
 
-        while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
-        // increment matched character count
-            k++;
-        }
-        if(k == pat_len) {
-        // increment pattern count, text index
-            ++count;
+        if (text[i] >= TABLE_SIZ || text[i] < 0) {
+            // move to next char if unknown char (Unicode, etc.)
             ++i;
-
         } else {
-            i = i + shift_table[text[i]];
+            while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
+            // increment matched character count
+                k++;
+            }
+            if(k == pat_len) {
+            // increment pattern count, text index
+                ++count;
+                ++i;
+    
+            } else {
+                // add on shift if known char
+                i = i + shift_table[text[i]];
+            }
         }
-		// if (myId == 0) {
-			//printf("i: %d\n", i);
-		//}
     }
 
-    // Add count to total matches atomically
     atomicAdd(num_matches, count);
-
 }
 
 
@@ -240,13 +260,11 @@ struct data_point {
  */ 
 int* create_shifts (char* pattern)
 {
-    // Offset for first ASCII character
-
-    // Line break ASCII value
-    const char LINE_BREAK = '\n';
 
     // Printable ASCII chars are 32-126 inclusive, line break is 10
     const int TABLE_SIZ = 126;
+
+    const int FIRST_ASCII = 32;
 
     int length = strlen(pattern);
     int* shift_table = (int*) malloc (sizeof(int) * TABLE_SIZ);
@@ -260,142 +278,10 @@ int* create_shifts (char* pattern)
         shift_table[pattern[j]] = length - 1 - j;
     }
 
-    // assign shift of 1 for line breaks
-    shift_table[LINE_BREAK] = 1;
+    // assign shift of 1 for unprintable characters
+    for (int i = 0; i < FIRST_ASCII; ++i) {
+        shift_table[i] = 1;
+    }
 
     return shift_table;
 }
-
-int linear_horspool_match(char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-	int* map, int* lineData, int num_chunks, int text_size, int pat_len, int myId) {
-
-	int count = 0;
-	//int lineDataIdx = map[myId];
-	//int num_entries = lineData[lineDataIdx];
-	int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
-
-	// don't need to check first pattern_length - 1 characters
-	int i = (myId * chunk_size) + pat_len - 1;
-	int k = 0;
-	while (i < text_length) {
-		// reset matched character count
-		k = 0;
-
-		if (i >= text_size) {
-			// break out if i tries to step past text length
-			break;
-		}
-
-		while (k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
-			// increment matched character count
-			k++;
-		}
-		if (k == pat_len) {
-			// increment pattern count, text index
-			++count;
-			++i;
-
-		}
-		else {
-			i = i + shift_table[text[i]];
-		}
-	}
-	return count;
-	// Add count to total matches atomically
-
-}
-
-/**
-*  Purpose:
-*    Get text line start index from pattern index
-*  
-*  Args:
-*    text       {char*}: Text c-string
-*    idx          {int}: Pattern start index
-*  
-*  Returns:
-*    {int}: Inclusive line start index  
-*/ 
-int get_line_start (char* text, int idx)
-{
-    const char NEW_LINE = '\n';
-
-    int start_idx = idx;
-
-    while (start_idx != 0 && text[start_idx] != NEW_LINE) {
-        // decrement until new line or text start reached
-        --start_idx;
-    }
-
-    return start_idx;
-}
-
-/**
-*  Purpose:
-*    Get text line end index from pattern index
-*  
-*  Args:
-*    text       {char*}: Text c-string
-*    idx          {int}: Pattern start index
-*    pattern_len  {int}: Optional param, pass if you know pattern length
-*  
-*  Returns:
-*    {char*}: Exclusive line end index 
-*/ 
-int get_line_end (char* text, int idx, int pattern_len)
-{
-    const char NULL_TERM = '\0';
-    const char NEW_LINE = '\n';
-
-    int end_idx = idx + pattern_len - 1;
-
-    while (text[end_idx] != NULL_TERM && text[end_idx] != NEW_LINE) {
-        // Increment until new line or null terminator found in text
-        ++end_idx;
-    }
-
-    return end_idx;
-}
-
-/**
-*  Purpose:
-*    Print c-string substring using indices with pattern highlighted in red
-* 
-*  Args:
-*    text      {char*}: Target c-string
-*    start_idx   {int}: Inclusive substring start index
-*    end_idx     {int}: Exclusive substring end index
-*    pat_start   {int}: Index of first pattern character
-*    pat_len     {int}: Pattern length
-* 
-*  Returns:
-*    None
-*/ 
-
-#define ANSI_COLOR_RED "\x1b[31m"
-#define ANSI_COLOR_RESET "\x1b[0m"
-
-void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len) 
-{
-    int is_red = 0;
-    int pat_end = pat_start + pat_len; 
-
-    for (int i = start_index; i < end_index; ++i) {
-        if(i == pat_start) {
-        // apply red highlight to pattern
-        printf(ANSI_COLOR_RED);
-        is_red = 1;
-        } else if (i == pat_end) {
-        // remove red highlight
-        printf(ANSI_COLOR_RESET);
-        }
-        printf("%c", text[i]);
-    }
-
-    if (is_red) {
-        // Remove highlight if still applied by line end
-        printf(ANSI_COLOR_RESET);
-    }
-}
-
-
