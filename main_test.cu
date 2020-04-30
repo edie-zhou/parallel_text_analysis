@@ -31,8 +31,6 @@ __global__ void gpu_prescan(unsigned int* d_out, unsigned int* d_in, unsigned in
 __global__ void gpu_add_block_sums(unsigned int* d_out, unsigned int* d_in, unsigned int* d_block_sums,
     size_t numElems);
 
-
-
 int determineNumBlocks(vector<string_chunk> chunks) {
 	int numBlocks = 0;
 	for (int i = 0; i < chunks.size(); i = i + NUM_THREADS_PER_BLOCK) {
@@ -80,6 +78,7 @@ int main(int argc, char* argv[])
         output[i] = 0;
     }
     cudaMemcpy(d_output, output, numBlocks * sizeof(int), cudaMemcpyHostToDevice);
+    free(output);
 
     time_t start, end , start1,end1 = 0;
     int text_len = strlen(flatText);
@@ -102,46 +101,36 @@ int main(int argc, char* argv[])
     unsigned int* result_arr = (unsigned int*) malloc (numBlocks * sizeof(unsigned int));
     cudaMemcpy(result_arr, d_result, sizeof(unsigned int) * numBlocks, cudaMemcpyDeviceToHost);
     cudaFree(d_result);
-    
-    for (int k = 0; k < numBlocks; ++k) {
-        printf("index: %d, val: %d\n", k, result_arr[k]);
-    }
-    
     free(result_arr);
     
     start1 = clock();
     unsigned int result = 0;
     for(int myId =0; myId < numBlocks * NUM_THREADS_PER_BLOCK; myId++){
         result += linear_horspool_match(flatText, testPattern, skipTable, numMatches, CHUNK_SIZE, 
-            num_chunks , text_len, pat_len, myId);    
+            num_chunks, text_len, pat_len, myId);    
     }
     end1 = clock();
-    //cout << "result is " << result << endl;
-    *numMatches = result;
     cudaDeviceSynchronize();
 
     // Calculating total time taken by the program. 
     double time_taken = double(end - start)/ CLOCKS_PER_SEC; 
-    cout << "Time taken by program is : " << setprecision(9) << time_taken << endl; 
+    cout << "Time taken by parallel program is: " << setprecision(9) << time_taken << endl; 
     time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
-    cout << "Time taken by program1 is : " << setprecision(9) << time_taken << endl; 
+    cout << "Number of matches found by parallel program: " << result_arr[numBlocks - 1] << endl;
+
+    cout << "Time taken by linear program1 is: " << setprecision(9) << time_taken << endl; 
     cudaMemcpy(numMatches, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
     cudaMemcpy(output, d_output, sizeof(int) * numBlocks, cudaMemcpyDeviceToHost);
+    cout << "Number of matches found by linear program: " << result << endl;
 
-    cout << "Number of Matches1: " << result << endl;
-    int answer= 0; 
-    for(int i = 0; i < numBlocks-1; i++){
-        answer += output[i];
-    }
-    cout << "Number of Matches: " << *numMatches << endl;
-
-
-	cudaFree(d_fullText); cudaFree(d_testPattern); cudaFree(d_skipTable); cudaFree(d_numMatches);
-	
+    cudaFree(d_fullText);
+    cudaFree(d_testPattern);
+    cudaFree(d_skipTable);
+    cudaFree(d_numMatches);
 
 	free(testPattern);
 	free(skipTable);
-	free(numMatches);
+    free(numMatches);
 }
 
 int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
