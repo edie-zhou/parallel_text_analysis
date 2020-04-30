@@ -39,14 +39,25 @@ int determineNumBlocks(vector<string_chunk> chunks) {
 	return numBlocks;
 }
 
+/*
+ *  Driver function
+ *  argv[0] is target pattern string
+ *  argv[1] is text path
+ */
 int main(int argc, char* argv[])
 {
-	Input inputObj;
+    if (argc < 2) {
+        printf("ERROR: Please pass in a target string and a file path.");
+        exit(-1);
+    }
 
-	char* flatText = inputObj.flattenText();
-	char* testPattern = (char*)malloc(5 * sizeof(char));
+	Input inputObj(argv[1]);
+    char* flatText = inputObj.flattenText();
+
+    int input_len = strlen(argv[0])
+	char* testPattern = (char*)malloc(input_len * sizeof(char) + 1);
     testPattern = strcpy(testPattern, "test");
-    testPattern[4] = '\0';
+    testPattern[input_len] = '\0';
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
@@ -117,6 +128,10 @@ int main(int argc, char* argv[])
     cout << "Time taken by parallel program is: " << setprecision(9) << time_taken << endl; 
     time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
     cout << "Number of matches found by parallel program: " << result_arr[numBlocks - 1] << endl;
+
+for (int i = 0 ; i < numBlocks; ++i) {
+    printf("index: %d, val: %d\n", result_arr[i]);
+}
 
     cout << "Time taken by linear program1 is: " << setprecision(9) << time_taken << endl; 
     cudaMemcpy(numMatches, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
