@@ -33,19 +33,6 @@ __global__ void gpu_prescan(unsigned int* d_out, unsigned int* d_in, unsigned in
 
 using namespace std;
 
-long * calcIndexes(long num_strings, long length){
-    long * indexArray = ( long *)malloc(sizeof( long) * (num_strings+2));
-
-    long i;
-    long sum ;
-   for (sum=0, i=0; i < num_strings; i++, sum+=CHUNK_SIZE){
-       indexArray[i] = sum;
-   }
-   indexArray[i] = sum + (length - ((num_strings-1) * CHUNK_SIZE));
-   indexArray[++i] = NULL;
-   return indexArray;
-}
-
 int determineNumBlocks(vector<string_chunk> chunks) {
 	int numBlocks = 0;
 	for (int i = 0; i < chunks.size(); i = i + NUM_THREADS_PER_BLOCK) {
@@ -339,27 +326,17 @@ void gpu_sum_scan_blelloch(unsigned int* d_out,
 	unsigned int* d_block_sums,
 	size_t numElems)
 {
-	extern __shared__ unsigned int s_out[];
-
-	unsigned int glbl_tid = blockDim.x * blockIdx.x + threadIdx.x;
-
+    extern __shared__ unsigned int s_out[];
+    
 	// Zero out shared memory
 	// Especially important when padding shmem for
 	//  non-power of 2 sized input
-	//s_out[2 * threadIdx.x] = 0;
-	//s_out[2 * threadIdx.x + 1] = 0;
 	s_out[threadIdx.x] = 0;
 	s_out[threadIdx.x + blockDim.x] = 0;
 
 	__syncthreads();
 
 	// Copy d_in to shared memory per block
-	//if (2 * glbl_tid < numElems)
-	//{
-	//	s_out[2 * threadIdx.x] = d_in[2 * glbl_tid];
-	//	if (2 * glbl_tid + 1 < numElems)
-	//		s_out[2 * threadIdx.x + 1] = d_in[2 * glbl_tid + 1];
-	//}
 	unsigned int cpy_idx = 2 * blockIdx.x * blockDim.x + threadIdx.x;
 	if (cpy_idx < numElems)
 	{
@@ -386,7 +363,7 @@ void gpu_sum_scan_blelloch(unsigned int* d_out,
 		// calculate necessary indexes
 		// right index must be (t+1) * 2^(s+1)) - 1
 		r_idx = ((threadIdx.x + 1) * (1 << (s + 1))) - 1;
-		if (r_idx >= 0 && r_idx < 2048)
+		if (r_idx < 2048)
 			t_active = 1;
 
 		if (t_active)
@@ -421,7 +398,7 @@ void gpu_sum_scan_blelloch(unsigned int* d_out,
 		// calculate necessary indexes
 		// right index must be (t+1) * 2^(s+1)) - 1
 		r_idx = ((threadIdx.x + 1) * (1 << (s + 1))) - 1;
-		if (r_idx >= 0 && r_idx < 2048)
+		if (r_idx < 2048)
 		{
 			t_active = 1;
 		}
