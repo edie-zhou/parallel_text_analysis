@@ -43,8 +43,14 @@ int main(int argc, char* argv[])
     const int TABLE_SIZ = 126;
 
     // printf("%d", argc);
-	if (argc != 3) {
-        printf("ERROR: Please pass in a target string and a file path.");
+    if (argc == 2 && (strcmp(argv[1], "-h") || strcmp(argv[1], "--help"))){
+        cout << "`match.exe` finds exact matches to a target string in text files." << endl
+            << "Type ./main.exe {target_string} {text file path} to use the program." << endl
+            << "Text file paths must be relative to the directory of `main.exe`." << endl;
+        exit(0);
+    }
+	else if (argc != 3) {
+        cout << "ERROR: Please pass in a target string and a file path." << endl;
         exit(-1);
     }
 
