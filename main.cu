@@ -42,7 +42,6 @@ int main(int argc, char* argv[])
     const int TABLE_SIZ = 126;
     int target_len = 0;
 
-    // printf("%d", argc);
     if (argc == 2 && (strcmp(argv[1], "-h") || strcmp(argv[1], "--help"))){
         cout << "`match.exe` finds exact matches to a target string in text files." << endl
             << "Type ./main.exe {target_string} {text file path} to use the program." << endl
@@ -69,8 +68,6 @@ int main(int argc, char* argv[])
 
         }
     }
-    // testPattern = c_str(input);
-    // printf("%d\n", target_len);
 
     strcpy (testPattern, input.data());
     testPattern[target_len] = '\0';
@@ -226,6 +223,9 @@ __global__ void horspool_match (char* text, char* pattern, int* shift_table, uns
     int i = (myId*chunk_size) + pat_len - 1;
     int k = 0;
     while(i < text_length) {
+        // reset matched character count
+        k = 0;
+
         if (i >= text_size) {
         // break out if i tries to step past text length
             break;
