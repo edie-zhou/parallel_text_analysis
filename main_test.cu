@@ -166,38 +166,12 @@ int main(int argc, char* argv[])
 	free(testPattern);
 	free(skipTable);
 	free(numMatches);
-
-    /*int num_matches = 0;
-    int* occ = horspool_match (test_str, 0, strlen(test_str), test_pattern, strlen(test_pattern),
-        skip, &num_matches);
-    // printf("Occurences of %s: %d\n", test_pattern, occ);
-
-    int line_start, line_end;
-    int pat_len = strlen(test_pattern);
-    printf("%d matches found!\n", num_matches);
-    for (int i = 0; i < num_matches; ++i) {
-        printf("\n");
-        // printf("Pattern found at index %d!\n", occ[i]);
-
-        // get inclusive line start
-        line_start = get_line_start(test_str, occ[i]);
-        
-        // get exclusive line end
-        line_end = get_line_end(test_str, occ[i], pat_len);
-
-        // printf("Line start: %d, end: %d\n", line_start, line_end);
-        // print line that pattern was found at
-        print_line (test_str, line_start, line_end, occ[i], pat_len);
-    }
-    printf("\n");*/
 }
 
 int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int* map, int* lineData, int num_chunks, int text_size, int pat_len, int myId) {
 
         int count = 0;
-        int lineDataIdx = map[myId];
-        int num_entries = lineData[lineDataIdx];
         int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
     
         // don't need to check first pattern_length - 1 characters
@@ -250,17 +224,6 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
  *    None
  */ 
  
- /* lineData data structure
-struct line_break_entry {
-	int line_break_index;
-	int line_break_number;
-}
-
-struct data_point {
-	int num entries;
-	line_break_entry[num_entries];
-}
-*/
 
  __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int* map, int* lineData, int num_chunks, int text_size, int pat_len , unsigned int* d_output) {
@@ -272,8 +235,7 @@ struct data_point {
     if(myId > num_chunks){ //if thread is an invalid thread
         return;
     }
-    int lineDataIdx = map[myId];
-    int num_entries = lineData[lineDataIdx];
+
     int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
 
     // don't need to check first pattern_length - 1 characters
