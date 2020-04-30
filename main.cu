@@ -1,4 +1,4 @@
-#pragma once
+// #pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,14 +39,26 @@ int determineNumBlocks(vector<string_chunk> chunks) {
 	return numBlocks;
 }
 
+/*
+ *  Driver function
+ *  argv[0] is target pattern string
+ *  argv[1] is text path
+ */
 int main(int argc, char* argv[])
 {
-	Input inputObj;
+    // printf("%d", argc);
+	if (argc != 3) {
+        printf("ERROR: Please pass in a target string and a file path.");
+        exit(-1);
+    }
 
-	char* flatText = inputObj.flattenText();
-	char* testPattern = (char*)malloc(5 * sizeof(char));
-    testPattern = strcpy(testPattern, "test");
-    testPattern[4] = '\0';
+	Input inputObj(argv[2]);
+    char* flatText = inputObj.flattenText();
+
+    int input_len = strlen(argv[1]);
+	char* testPattern = (char*)malloc(input_len * sizeof(char) + 1);
+    testPattern = strcpy(testPattern, argv[1]);
+    testPattern[input_len] = '\0';
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
@@ -98,6 +110,8 @@ int main(int argc, char* argv[])
     sum_scan_blelloch(d_result, d_output, numBlocks);
     end = clock();
     
+    unsigned int* parallel_result = (unsigned int*) malloc(sizeof(unsigned int));
+    cudaMemcpy(parallel_result, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
     unsigned int* result_arr = (unsigned int*) malloc (numBlocks * sizeof(unsigned int));
     cudaMemcpy(result_arr, d_result, sizeof(unsigned int) * numBlocks, cudaMemcpyDeviceToHost);
     cudaFree(d_result);
@@ -116,12 +130,15 @@ int main(int argc, char* argv[])
     double time_taken = double(end - start)/ CLOCKS_PER_SEC; 
     cout << "Time taken by parallel program is: " << setprecision(9) << time_taken << endl; 
     time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
-    cout << "Number of matches found by parallel program: " << result_arr[numBlocks - 1] << endl;
+    cout << "Number of matches found by parallel program: " << *parallel_result << endl;
 
     cout << "Time taken by linear program1 is: " << setprecision(9) << time_taken << endl; 
     cudaMemcpy(numMatches, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
     cudaMemcpy(output, d_output, sizeof(int) * numBlocks, cudaMemcpyDeviceToHost);
     cout << "Number of matches found by linear program: " << result << endl;
+// for (int i = 0; i < numBlocks; ++i) {
+//     printf("index: %d, val: %d\n", i, result_arr[i]);
+// }
 
     cudaFree(d_fullText);
     cudaFree(d_testPattern);
@@ -190,7 +207,7 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
 
  __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int num_chunks, int text_size, int pat_len , unsigned int* d_output) {
-    extern __shared__ int s[];
+    extern __shared__ int s;
 
 
     int count = 0;
@@ -227,18 +244,26 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
         }
     }
 
-    // atomicAdd(num_matches, count);
-    s[threadIdx.x] = count;
-    __syncthreads();
+    atomicAdd(num_matches, count);
+// printf("count: %d\n", num_matches);
+// printf("id: %d, count: %d\n", myId, *num_matches);
+    // printf("%d\n", threadIdx.x);
+    
+    // adding in device memory is faster
+//     if (threadIdx.x == 0 ){
+//         s = count;
+//     }
 
-    // Add count to total matches atomically
-    if (threadIdx.x == 0 ){
-        int sum = 0; 
-        for(int idx =0; idx < NUM_THREADS_PER_BLOCK; idx++){
-            sum += s[idx];
-        }
-        d_output[blockIdx.x] = sum;
-    }
+//     __syncthreads();
+//     if (threadIdx.x != 0 ){
+//         s += count;
+//     }
+    
+// __syncthreads();
+// if (threadIdx.x == 0 ){
+//     printf("sum:%d", s);
+// }
+    
 }
 
 
