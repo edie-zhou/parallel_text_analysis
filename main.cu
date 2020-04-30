@@ -256,9 +256,6 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
             }
             if(k == pat_len) {
             // increment pattern count, text index
-				if (myId == 26) {
-					printf("%d\n", i);
-				}
 				addLineResponse(text, i, chunk_size * myId, lineData, map[mapIdx], lineDataResponse, myId, chunk_size, pat_len);
                 ++count;
                 ++i;
@@ -302,9 +299,6 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
 		 spaceLeft = 20 - (pat_len + 1);
 	 }
 	 int padding = spaceLeft / 2;
-	 if (myId == 26) {
-		 printf("padding: %d\n spaceLeft: %d\n", padding, spaceLeft);
-	 }
 	 writeString(text, textIdx, lineDataResponse, lineNumber, padding, pat_len);
  }
 
@@ -329,7 +323,6 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
 
  __device__ void writeString(char* text, int stringIndex, char* lineDataResponse, int lineNumber, int padding, int pat_len) {
 	 if (lineNumber == -1) return;
-	 //printf("found pattern at line: %d\n", lineNumber);
 	 if (lineDataResponse[(lineNumber - 1) * 21] == '\0') {
 		 int startingIndex = stringIndex - pat_len - padding;
 		 if (startingIndex < 0) startingIndex = 0;
@@ -378,6 +371,7 @@ int* create_shifts (char* pattern)
 }
 
 void print_lines(char* lineDataResponse, int numLines) {
+	cout << "Matches: " << endl << endl;
 	for (int i = 0; i < numLines; i++) {
 		if (lineDataResponse[21 * i] != '\0') {
 			cout << "Line " << i + 1 << ": ";
