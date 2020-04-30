@@ -1,5 +1,4 @@
 // #pragma once
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +40,7 @@ int determineNumBlocks(vector<string_chunk> chunks) {
 int main(int argc, char* argv[])
 {
     const int TABLE_SIZ = 126;
+    int target_len = 0;
 
     // printf("%d", argc);
     if (argc == 2 && (strcmp(argv[1], "-h") || strcmp(argv[1], "--help"))){
@@ -48,19 +48,33 @@ int main(int argc, char* argv[])
             << "Type ./main.exe {target_string} {text file path} to use the program." << endl
             << "Text file paths must be relative to the directory of `main.exe`." << endl;
         exit(0);
-    }
-	else if (argc != 3) {
+    } else if (argc == 1) {
         cout << "ERROR: Please pass in a target string and a file path." << endl;
         exit(-1);
     }
+    for (int i = 1; i < argc - 1; ++i) {
+        target_len += strlen(argv[i]);
+    }
+    target_len += argc - 3;
+    
 
-	Input inputObj(argv[2]);
+	Input inputObj(argv[argc - 1]);
     char* flatText = inputObj.flattenText();
 
-    int input_len = strlen(argv[1]);
-	char* testPattern = (char*)malloc(input_len * sizeof(char) + 1);
-    testPattern = strcpy(testPattern, argv[1]);
-    testPattern[input_len] = '\0';
+    char* testPattern = (char*)malloc(target_len * sizeof(char) + 1);
+    string input = argv[1];
+    if (argc > 3) {
+        for (int i = 2; i < argc - 1; ++i) {
+            input = input + " " + argv[i];
+
+        }
+    }
+    // testPattern = c_str(input);
+    // printf("%d\n", target_len);
+
+    strcpy (testPattern, input.data());
+    testPattern[target_len] = '\0';
+
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
@@ -86,7 +100,7 @@ int main(int argc, char* argv[])
 	cudaMemcpy(d_numMatches, numMatches, sizeof(unsigned int), cudaMemcpyHostToDevice);
 
     
-    time_t start, end , start1,end1 = 0;
+    time_t start, end, start1, end1 = 0;
     int text_len = strlen(flatText);
     int pat_len = strlen(testPattern); 
     int num_chunks = inputObj.getChunks().size();
@@ -115,14 +129,14 @@ int main(int argc, char* argv[])
 
     // Calculating total time taken by the program. 
     double time_taken = double(end - start)/ CLOCKS_PER_SEC; 
-    cout << "Time taken by parallel program: " << setprecision(9) << time_taken << endl;
-    cout << "There are " << *parallel_result << " exact matches to string `" << argv[1] << "`" << 
-        endl << "found by parallel program in file `" << argv[2] <<"`"<< endl << endl;
+    cout << "Time taken by parallel program: " << setprecision(9) << time_taken << " secs." << endl;
+    cout << "There are " << *parallel_result << " exact matches to string `" << input << "`" << 
+        endl << "found by parallel program in file `" << argv[argc-1] <<"`"<< endl << endl;
 
     time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
-    cout << "Time taken by linear program: " << setprecision(9) << time_taken << endl; 
-    cout << "There are " << result << " exact matches to string `" << argv[1] << "`" <<
-        endl << "found by linear program in file `" << argv[2] <<"`"<< endl;
+    cout << "Time taken by linear program: " << setprecision(9) << time_taken <<  " secs." << endl; 
+    cout << "There are " << result << " exact matches to string `" << input << "`" <<
+        endl << "found by linear program in file `" << argv[argc-1] <<"`"<< endl;
 
     cudaFree(d_fullText);
     cudaFree(d_testPattern);
@@ -195,9 +209,7 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
  *  Returns:
  *    None
  */ 
- 
-
- __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+__global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int num_chunks, int text_size, int pat_len) {
     
     const int TABLE_SIZ = 126;
@@ -214,9 +226,6 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
     int i = (myId*chunk_size) + pat_len - 1;
     int k = 0;
     while(i < text_length) {
-        // reset matched character count
-        k = 0;
-
         if (i >= text_size) {
         // break out if i tries to step past text length
             break;
