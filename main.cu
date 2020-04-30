@@ -40,6 +40,8 @@ int determineNumBlocks(vector<string_chunk> chunks) {
  */
 int main(int argc, char* argv[])
 {
+    const int TABLE_SIZ = 126;
+
     // printf("%d", argc);
 	if (argc != 3) {
         printf("ERROR: Please pass in a target string and a file path.");
@@ -59,7 +61,7 @@ int main(int argc, char* argv[])
 
 	int fullTextSize = inputObj.getChunks().size() * CHUNK_SIZE * sizeof(char);
 	int patternSize = strlen(testPattern) * sizeof(char);
-	int skipTableSize = 126 * sizeof(int);
+	int skipTableSize = TABLE_SIZ * sizeof(int);
 
 	char* d_fullText;
 	char* d_testPattern;
@@ -85,7 +87,7 @@ int main(int argc, char* argv[])
     int numBlocks = determineNumBlocks(inputObj.getChunks());
     cudaDeviceSynchronize();
 
-    //time(&start);   
+    time(&start);   
     start = clock();
 
 	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK, NUM_THREADS_PER_BLOCK * sizeof(int) >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
@@ -94,7 +96,6 @@ int main(int argc, char* argv[])
     
     cudaMemcpy(parallel_result, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
     end = clock();
-    
     
 
     start1 = clock();
@@ -109,10 +110,10 @@ int main(int argc, char* argv[])
     // Calculating total time taken by the program. 
     double time_taken = double(end - start)/ CLOCKS_PER_SEC; 
     cout << "Time taken by parallel program is: " << setprecision(9) << time_taken << endl;
-    cout << "Number of matches found by parallel program: " << *parallel_result << endl;
+    cout << "Number of exact matches of found by parallel program: " << *parallel_result << endl;
 
     time_taken = double(end1 - start1)/ CLOCKS_PER_SEC;
-    cout << "Time taken by linear program1 is: " << setprecision(9) << time_taken << endl; 
+    cout << "Time taken by linear program is: " << setprecision(9) << time_taken << endl; 
     cout << "Number of matches found by linear program: " << result << endl;
 
     cudaFree(d_fullText);
@@ -127,6 +128,8 @@ int main(int argc, char* argv[])
 
 int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int num_chunks, int text_size, int pat_len, int myId) {
+        
+        const int TABLE_SIZ = 126;
 
         int count = 0;
         int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
@@ -142,18 +145,24 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
             // break out if i tries to step past text length
                 break;
             }
-    
-            while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
-            // increment matched character count
-                k++;
-            }
-            if(k == pat_len) {
-            // increment pattern count, text index
-                ++count;
+
+            if (text[i] >= TABLE_SIZ || text[i] < 0) {
+                // move to next char if unknown char (Unicode, etc.)
                 ++i;
-    
             } else {
-                i = i + shift_table[text[i]];
+                while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
+                // increment matched character count
+                    k++;
+                }
+                if(k == pat_len) {
+                // increment pattern count, text index
+                    ++count;
+                    ++i;
+        
+                } else {
+                    // add on shift if known char
+                    i = i + shift_table[text[i]];
+                }
             }
         }
         return count;
@@ -182,8 +191,8 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
 
  __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int num_chunks, int text_size, int pat_len) {
-    extern __shared__ int s;
-
+    
+    const int TABLE_SIZ = 126;
 
     int count = 0;
     int myId = threadIdx.x + blockDim.x * blockIdx.x;
@@ -205,17 +214,23 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
             break;
         }
 
-        while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
-        // increment matched character count
-            k++;
-        }
-        if(k == pat_len) {
-        // increment pattern count, text index
-            ++count;
+        if (text[i] >= TABLE_SIZ || text[i] < 0) {
+            // move to next char if unknown char (Unicode, etc.)
             ++i;
-
         } else {
-            i = i + shift_table[text[i]];
+            while(k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
+            // increment matched character count
+                k++;
+            }
+            if(k == pat_len) {
+            // increment pattern count, text index
+                ++count;
+                ++i;
+    
+            } else {
+                // add on shift if known char
+                i = i + shift_table[text[i]];
+            }
         }
     }
 
@@ -232,13 +247,11 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
  */ 
 int* create_shifts (char* pattern)
 {
-    // Offset for first ASCII character
-
-    // Line break ASCII value
-    const char LINE_BREAK = '\n';
 
     // Printable ASCII chars are 32-126 inclusive, line break is 10
     const int TABLE_SIZ = 126;
+
+    const int FIRST_ASCII = 32;
 
     int length = strlen(pattern);
     int* shift_table = (int*) malloc (sizeof(int) * TABLE_SIZ);
@@ -252,8 +265,10 @@ int* create_shifts (char* pattern)
         shift_table[pattern[j]] = length - 1 - j;
     }
 
-    // assign shift of 1 for line breaks
-    shift_table[LINE_BREAK] = 1;
+    // assign shift of 1 for unprintable characters
+    for (int i = 0; i < FIRST_ASCII; ++i) {
+        shift_table[i] = 1;
+    }
 
     return shift_table;
 }
