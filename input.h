@@ -7,7 +7,7 @@
 #include <iostream>
 #include <vector>
 
-#define CHUNK_SIZE 10
+#define CHUNK_SIZE 32
 //#define CHUNK_SIZE 6
 
 using namespace std;
