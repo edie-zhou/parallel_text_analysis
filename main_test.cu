@@ -15,9 +15,7 @@
 #define NUM_THREADS_PER_BLOCK 512
 
 int* create_shifts (char* pattern);
-int get_line_start (char* text, int idx);
-int get_line_end (char* text, int idx, int pattern_len);
-void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len);
+
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int* map, int* lineData, int num_chunks, int text_size, int pat_len, unsigned int* d_output);
@@ -353,100 +351,6 @@ int* create_shifts (char* pattern)
 
     return shift_table;
 }
-
-/**
-*  Purpose:
-*    Get text line start index from pattern index
-*  
-*  Args:
-*    text       {char*}: Text c-string
-*    idx          {int}: Pattern start index
-*  
-*  Returns:
-*    {int}: Inclusive line start index  
-*/ 
-int get_line_start (char* text, int idx)
-{
-    const char NEW_LINE = '\n';
-
-    int start_idx = idx;
-
-    while (start_idx != 0 && text[start_idx] != NEW_LINE) {
-        // decrement until new line or text start reached
-        --start_idx;
-    }
-
-    return start_idx;
-}
-
-/**
-*  Purpose:
-*    Get text line end index from pattern index
-*  
-*  Args:
-*    text       {char*}: Text c-string
-*    idx          {int}: Pattern start index
-*    pattern_len  {int}: Optional param, pass if you know pattern length
-*  
-*  Returns:
-*    {char*}: Exclusive line end index 
-*/ 
-int get_line_end (char* text, int idx, int pattern_len)
-{
-    const char NULL_TERM = '\0';
-    const char NEW_LINE = '\n';
-
-    int end_idx = idx + pattern_len - 1;
-
-    while (text[end_idx] != NULL_TERM && text[end_idx] != NEW_LINE) {
-        // Increment until new line or null terminator found in text
-        ++end_idx;
-    }
-
-    return end_idx;
-}
-
-/**
-*  Purpose:
-*    Print c-string substring using indices with pattern highlighted in red
-* 
-*  Args:
-*    text      {char*}: Target c-string
-*    start_idx   {int}: Inclusive substring start index
-*    end_idx     {int}: Exclusive substring end index
-*    pat_start   {int}: Index of first pattern character
-*    pat_len     {int}: Pattern length
-* 
-*  Returns:
-*    None
-*/ 
-
-#define ANSI_COLOR_RED "\x1b[31m"
-#define ANSI_COLOR_RESET "\x1b[0m"
-
-void print_line (char* text, int start_index, int end_index, int pat_start, int pat_len) 
-{
-    int is_red = 0;
-    int pat_end = pat_start + pat_len; 
-
-    for (int i = start_index; i < end_index; ++i) {
-        if(i == pat_start) {
-        // apply red highlight to pattern
-        printf(ANSI_COLOR_RED);
-        is_red = 1;
-        } else if (i == pat_end) {
-        // remove red highlight
-        printf(ANSI_COLOR_RESET);
-        }
-        printf("%c", text[i]);
-    }
-
-    if (is_red) {
-        // Remove highlight if still applied by line end
-        printf(ANSI_COLOR_RESET);
-    }
-}
-
 
 #define MAX_BLOCK_SZ 1024
 #define NUM_BANKS 32
