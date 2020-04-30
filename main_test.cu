@@ -424,13 +424,6 @@ void gpu_sum_scan_blelloch(unsigned int* d_out,
 		__syncthreads();
 	}
 
-	// Copy the results to global memory
-	//if (2 * glbl_tid < numElems)
-	//{
-	//	d_out[2 * glbl_tid] = s_out[2 * threadIdx.x];
-	//	if (2 * glbl_tid + 1 < numElems)
-	//		d_out[2 * glbl_tid + 1] = s_out[2 * threadIdx.x + 1];
-	//}
 	if (cpy_idx < numElems)
 	{
 		d_out[cpy_idx] = s_out[threadIdx.x];
@@ -448,9 +441,6 @@ void gpu_add_block_sums(unsigned int* d_out,
 	//unsigned int glbl_t_idx = blockDim.x * blockIdx.x + threadIdx.x;
 	unsigned int d_block_sum_val = d_block_sums[blockIdx.x];
 
-	//unsigned int d_in_val_0 = 0;
-	//unsigned int d_in_val_1 = 0;
-
 	// Simple implementation's performance is not significantly (if at all)
 	//  better than previous verbose implementation
 	unsigned int cpy_idx = 2 * blockIdx.x * blockDim.x + threadIdx.x;
@@ -460,27 +450,6 @@ void gpu_add_block_sums(unsigned int* d_out,
 		if (cpy_idx + blockDim.x < numElems)
 			d_out[cpy_idx + blockDim.x] = d_in[cpy_idx + blockDim.x] + d_block_sum_val;
 	}
-
-	//if (2 * glbl_t_idx < numElems)
-	//{
-	//	d_out[2 * glbl_t_idx] = d_in[2 * glbl_t_idx] + d_block_sum_val;
-	//	if (2 * glbl_t_idx + 1 < numElems)
-	//		d_out[2 * glbl_t_idx + 1] = d_in[2 * glbl_t_idx + 1] + d_block_sum_val;
-	//}
-
-	//if (2 * glbl_t_idx < numElems)
-	//{
-	//	d_in_val_0 = d_in[2 * glbl_t_idx];
-	//	if (2 * glbl_t_idx + 1 < numElems)
-	//		d_in_val_1 = d_in[2 * glbl_t_idx + 1];
-	//}
-	//else
-	//	return;
-	//__syncthreads();
-
-	//d_out[2 * glbl_t_idx] = d_in_val_0 + d_block_sum_val;
-	//if (2 * glbl_t_idx + 1 < numElems)
-	//	d_out[2 * glbl_t_idx + 1] = d_in_val_1 + d_block_sum_val;
 }
 
 // Modified version of Mark Harris' implementation of the Blelloch scan
