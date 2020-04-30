@@ -18,13 +18,17 @@ using namespace std;
 #define NUM_THREADS_PER_BLOCK 512
 
 int* create_shifts (char* pattern);
+void print_lines(char* lineDataResponse, int numLines);
 
 int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int num_chunks, int text_size, int pat_len, int myId);
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int num_chunks, int text_size, int pat_len);
+    int num_chunks, int text_size, int pat_len, int* map, int* lineData, char* lineDataResponse);
 __global__ void prescan(int *g_odata, int *g_idata, int n);
+__device__ void addLineResponse(char* text, int textIdx, int chunkBeginIdx, int* lineData, int lineDataIndex, char* lineDataResponse, int myId, int chunkSize, int pat_len);
+__device__ int getLocalNewLineIndex(char* text, int textIdx, int chunkBeginIdx, int* chunksToSkip, int chunkSize, int myId);
+__device__ void writeString(char* text, int stringIndex, char* lineDataResponse, int lineNumber, int padding, int pat_len);
 
 int determineNumBlocks(vector<string_chunk> chunks) {
 	int numBlocks = 0;
@@ -43,10 +47,6 @@ int main(int argc, char* argv[])
 {
     const int TABLE_SIZ = 126;
 
-	cout << argc << endl;
-	for (int i = 0; i < argc; i++) {
-		cout << argv[i] << endl;
-	}
     // printf("%d", argc);
     if (argc == 2 && (strcmp(argv[1], "-h") || strcmp(argv[1], "--help"))){
         cout << "`match.exe` finds exact matches to a target string in text files." << endl
@@ -69,27 +69,40 @@ int main(int argc, char* argv[])
     int* skipTable = create_shifts(testPattern);
 	unsigned int* numMatches = (unsigned int*)malloc(1 * sizeof(unsigned int));
 	*numMatches = 0;
+	int* map = inputObj.getMap();
+	int* lineData = inputObj.getLineData();
+	char* lineDataResponse = inputObj.getLineDataResponse();
 
 	int fullTextSize = inputObj.getChunks().size() * CHUNK_SIZE * sizeof(char);
 	int patternSize = strlen(testPattern) * sizeof(char);
 	int skipTableSize = TABLE_SIZ * sizeof(int);
+	int mapSize = inputObj.getMapSize();
+	int lineDataSize = inputObj.getLineDataSize();
+	int lineDataResponseSize = inputObj.getLineDataResponseSize();
 
 	char* d_fullText;
 	char* d_testPattern;
 	int* d_skipTable;
 	unsigned int* d_numMatches;
     unsigned int* parallel_result = (unsigned int*) malloc(sizeof(unsigned int));
+	int* d_map;
+	int* d_lineData;
+	char* d_lineDataResponse;
 
 	cudaMalloc((void**)& d_fullText, fullTextSize);
 	cudaMalloc((void**)& d_testPattern, patternSize);
 	cudaMalloc((void**)& d_skipTable, skipTableSize);
 	cudaMalloc((void**)& d_numMatches, sizeof(unsigned int));
+	cudaMalloc((void**)& d_map, mapSize);
+	cudaMalloc((void**)& d_lineData, lineDataSize);
+	cudaMalloc((void**)& d_lineDataResponse, lineDataResponseSize);
 
 	cudaMemcpy(d_fullText, flatText, fullTextSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_testPattern, testPattern, patternSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_skipTable, skipTable, skipTableSize, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_numMatches, numMatches, sizeof(unsigned int), cudaMemcpyHostToDevice);
-
+	cudaMemcpy(d_map, map, mapSize, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_lineData, lineData, lineDataSize, cudaMemcpyHostToDevice);
     
     time_t start, end , start1,end1 = 0;
     int text_len = strlen(flatText);
@@ -102,12 +115,14 @@ int main(int argc, char* argv[])
     start = clock();
 
 	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK, NUM_THREADS_PER_BLOCK * sizeof(int) >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
-        num_chunks, text_len, pat_len);
-        cudaDeviceSynchronize();
+        num_chunks, text_len, pat_len, d_map, d_lineData, d_lineDataResponse);
     
-    cudaMemcpy(parallel_result, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
-    end = clock();
+	cudaDeviceSynchronize();
+
+	end = clock();
     
+	cudaMemcpy(parallel_result, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(lineDataResponse, d_lineDataResponse, lineDataResponseSize, cudaMemcpyDeviceToHost);
 
     start1 = clock();
     unsigned int result = 0;
@@ -120,6 +135,7 @@ int main(int argc, char* argv[])
 
     // Calculating total time taken by the program. 
     double time_taken = double(end - start)/ CLOCKS_PER_SEC; 
+	print_lines(lineDataResponse, inputObj.getNumLines());
     cout << "Time taken by parallel program: " << setprecision(9) << time_taken << endl;
     cout << "There are " << *parallel_result << " exact matches to string `" << argv[1] << "`" << 
         endl << "found by parallel program in file `" << argv[2] <<"`"<< endl << endl;
@@ -200,10 +216,9 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
  *  Returns:
  *    None
  */ 
- 
 
  __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
-    int num_chunks, int text_size, int pat_len) {
+    int num_chunks, int text_size, int pat_len, int* map, int* lineData, char* lineDataResponse) {
     
     const int TABLE_SIZ = 126;
 
@@ -214,6 +229,10 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
     }
 
     int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
+
+	int mapIdx = myId;
+	int numNewLineEntries = lineData[map[mapIdx]];
+
 
     // don't need to check first pattern_length - 1 characters
     int i = (myId*chunk_size) + pat_len - 1;
@@ -237,8 +256,13 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
             }
             if(k == pat_len) {
             // increment pattern count, text index
+				if (myId == 26) {
+					printf("%d\n", i);
+				}
+				addLineResponse(text, i, chunk_size * myId, lineData, map[mapIdx], lineDataResponse, myId, chunk_size, pat_len);
                 ++count;
                 ++i;
+				
     
             } else {
                 // add on shift if known char
@@ -249,6 +273,73 @@ int linear_horspool_match (char* text, char* pattern, int* shift_table, unsigned
 
     atomicAdd(num_matches, count);
 }
+
+ __device__ void addLineResponse(char* text, int textIdx, int chunkBeginIdx, int* lineData, int lineDataIndex, char* lineDataResponse, int myId, int chunkSize, int pat_len) {
+	 int chunksToSkip = 0;
+	 int localNewLineIndex = getLocalNewLineIndex(text, textIdx, chunkBeginIdx, &chunksToSkip, chunkSize, myId);
+	 int modifiedLineDataIndex = lineDataIndex;
+	 while (chunksToSkip > 0) {
+		 int numEntries = lineData[modifiedLineDataIndex];
+		 modifiedLineDataIndex++;
+		 modifiedLineDataIndex = modifiedLineDataIndex + (numEntries * 2);
+		 chunksToSkip--;
+	 }
+	 int numEntries = lineData[modifiedLineDataIndex];
+	 int lineNumber = -1;
+	 int offset = -1;
+	 for (int i = 0; (i < numEntries) && (lineNumber == -1); i++) {
+		 offset += 2;
+		 if (lineData[modifiedLineDataIndex + offset] == localNewLineIndex) {
+			 lineNumber = lineData[modifiedLineDataIndex + offset + 1];
+		 }
+	 }
+
+	 int spaceLeft;
+	 if ((pat_len % 2) == 0) {
+		 spaceLeft = 20 - pat_len;
+	 }
+	 else {
+		 spaceLeft = 20 - (pat_len + 1);
+	 }
+	 int padding = spaceLeft / 2;
+	 if (myId == 26) {
+		 printf("padding: %d\n spaceLeft: %d\n", padding, spaceLeft);
+	 }
+	 writeString(text, textIdx, lineDataResponse, lineNumber, padding, pat_len);
+ }
+
+ __device__ int getLocalNewLineIndex(char* text, int textIdx, int chunkBeginIndex, int* chunksToSkip, int chunkSize, int myId) {
+	 int tempIdx = textIdx;
+	 int globalIndex = -1;
+	 while (globalIndex == -1) {
+		 if (text[tempIdx] == '\n') {
+			 globalIndex = tempIdx;
+		 }
+		 else {
+			 tempIdx++;
+		 }
+	 }
+	 int localIndex = globalIndex - chunkBeginIndex;
+	 while (localIndex > chunkSize) {
+		 localIndex -= chunkSize;
+		 *chunksToSkip = *chunksToSkip + 1;
+	 }
+	 return localIndex;
+ }
+
+ __device__ void writeString(char* text, int stringIndex, char* lineDataResponse, int lineNumber, int padding, int pat_len) {
+	 if (lineNumber == -1) return;
+	 //printf("found pattern at line: %d\n", lineNumber);
+	 if (lineDataResponse[(lineNumber - 1) * 21] == '\0') {
+		 int startingIndex = stringIndex - pat_len - padding;
+		 if (startingIndex < 0) startingIndex = 0;
+		 for (int i = 0; i < 20; i++) {
+			 lineDataResponse[((lineNumber - 1) * 21) + i] = text[startingIndex];
+			 startingIndex++;
+		 }
+		 lineDataResponse[20] = '\0';
+	 }
+ }
 
 
 /**
@@ -284,4 +375,17 @@ int* create_shifts (char* pattern)
     }
 
     return shift_table;
+}
+
+void print_lines(char* lineDataResponse, int numLines) {
+	for (int i = 0; i < numLines; i++) {
+		if (lineDataResponse[21 * i] != '\0') {
+			cout << "Line " << i + 1 << ": ";
+			for (int j = 0; lineDataResponse[21 * i + j] != '\0'; j++) {
+				cout << lineDataResponse[21 * i + j];
+			}
+			cout << endl;
+		}
+	}
+	cout << endl;
 }

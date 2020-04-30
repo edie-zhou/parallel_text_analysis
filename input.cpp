@@ -10,6 +10,8 @@ Input::Input() {
 	numLineBreaks = 0;
 	textSize = 0;
 	splitOnChars();
+	createLineData();
+	createLineDataResponse();
 }
 
 Input::Input(const char* fname) {
@@ -18,6 +20,8 @@ Input::Input(const char* fname) {
 	numLineBreaks = 0;
 	textSize = 0;
 	splitOnChars();
+	createLineData();
+	createLineDataResponse();
 }
 
 Input::~Input() {
@@ -82,7 +86,6 @@ void Input::splitOnChars() {
 		chunks.push_back(chunk);
 	}
 	array_from_chunk_vector();
-	createLineData();
 	return;
 }
 
@@ -116,13 +119,22 @@ void Input::createLineData() {
 	}
 }
 
+void Input::createLineDataResponse() {
+	lineDataResponseSize = (21 * chunks.size() * sizeof(char));
+	lineDataResponse = (char*)malloc(lineDataResponseSize);
+	for (int i = 0; i < chunks.size(); i++) {
+		lineDataResponse[21 * i] = '\0';
+	}
+}
+
 void Input::clean() {
 	for (int i = 0; i < chunks.size(); i++) {
 		free(chunks.at(i).str);
 	}
 	free(cStyleArrStrings);
 	if (flattenedTextBool) free(flattenedText);
-	free(lineData);
 	free(map);
+	free(lineData);
+	free(lineDataResponse);
 	return;
 }

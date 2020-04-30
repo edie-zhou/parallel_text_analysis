@@ -7,7 +7,7 @@
 #include <iostream>
 #include <vector>
 
-#define CHUNK_SIZE 10
+#define CHUNK_SIZE 256
 //#define CHUNK_SIZE 6
 
 using namespace std;
@@ -31,10 +31,13 @@ public:
 	vector<string_chunk> getChunks() const { return chunks; }
 	int* getMap() const { return map; }
 	int* getLineData() const { return lineData; }
+	char* getLineDataResponse() const { return lineDataResponse; }
 
 	int getTextSize() const { return textSize; }
 	int getMapSize() const { return mapSize; }
 	int getLineDataSize() const { return lineDataSize; }
+	int getLineDataResponseSize() const { return lineDataResponseSize; }
+	int getNumLines() const { return numLineBreaks; }
 
 private:
 
@@ -44,6 +47,7 @@ private:
 	int numLineBreaks;
 	int mapSize;
 	int lineDataSize;
+	int lineDataResponseSize;
 
 	const char* filename;
 	char** cStyleArrStrings;
@@ -51,6 +55,7 @@ private:
 
 	int* map;
 	int* lineData;
+	char* lineDataResponse;
 
 	//used when allocating data for GPU
 	int stringCount;
@@ -61,6 +66,7 @@ private:
 	void array_from_chunk_vector();
 
 	void createLineData();
+	void createLineDataResponse();
 
 	void clean();
 
