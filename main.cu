@@ -7,6 +7,7 @@
 #include <iostream>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include <iomanip>
 
 #include "input.h"
 
@@ -19,6 +20,8 @@ void print_line (char* text, int start_index, int end_index, int pat_start, int 
 
 __global__ void horspool_match (char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
     int* map, int* lineData, int num_chunks, int text_size, int pat_len);
+int linear_horspool_match(char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+	int* map, int* lineData, int num_chunks, int text_size, int pat_len, int myId);
 
 
 using namespace std;
@@ -46,8 +49,7 @@ int determineNumBlocks(vector<string_chunk> chunks) {
 
 int main(int argc, char* argv[])
 {
-	Input inputObj("sample-texts/Bible_KJV.txt");
-
+	Input inputObj;
 	char* flatText = inputObj.flattenText();
 	char* testPattern = (char*)malloc(4 * sizeof(char));
 	testPattern = strcpy(testPattern, "him");
@@ -86,18 +88,31 @@ int main(int argc, char* argv[])
 
     int numBlocks = determineNumBlocks(inputObj.getChunks());
     time_t start, end = 0; 
+	time_t start_linear, end_linear = 0;
+	int text_len = strlen(flatText);
+	int pat_len = strlen(testPattern);
+	int num_chunks = inputObj.getChunks().size();
     cudaDeviceSynchronize();
-    time(&start); 
+	start = clock();
 
 	horspool_match << <numBlocks, NUM_THREADS_PER_BLOCK >> > (d_fullText, d_testPattern, d_skipTable, d_numMatches, CHUNK_SIZE, 
 															d_map, d_lineData, inputObj.getChunks().size(), inputObj.getTextSize(), strlen(testPattern));
     cudaDeviceSynchronize();
-    time(&end); 
+	end = clock();
+	start_linear = clock();
+	unsigned int result = 0;
+	for (int myId = 0; myId < numBlocks * NUM_THREADS_PER_BLOCK; myId++) {
+		result += linear_horspool_match(flatText, testPattern, skipTable, numMatches, CHUNK_SIZE,
+			map, lineData, num_chunks, text_len, pat_len, myId);
+	}
+	cout << "hello" << endl;
+	end_linear = clock();
   
     // Calculating total time taken by the program. 
-    double time_taken = double(end - start); 
-    cout << "Time taken by program is : " << fixed 
-         << time_taken << endl; 
+	double time_taken = double(end - start) / CLOCKS_PER_SEC;
+	cout << "Time taken by parallel program is : " << setprecision(9) << time_taken << endl;
+	time_taken = double(end_linear - start_linear) / CLOCKS_PER_SEC;
+	cout << "Time taken by linear program is : " << setprecision(9) << time_taken << endl;
 
 	cudaMemcpy(numMatches, d_numMatches, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 	
@@ -249,6 +264,45 @@ int* create_shifts (char* pattern)
     shift_table[LINE_BREAK] = 1;
 
     return shift_table;
+}
+
+int linear_horspool_match(char* text, char* pattern, int* shift_table, unsigned int* num_matches, int chunk_size,
+	int* map, int* lineData, int num_chunks, int text_size, int pat_len, int myId) {
+
+	int count = 0;
+	//int lineDataIdx = map[myId];
+	//int num_entries = lineData[lineDataIdx];
+	int text_length = (chunk_size * myId) + chunk_size + pat_len - 1;
+
+	// don't need to check first pattern_length - 1 characters
+	int i = (myId * chunk_size) + pat_len - 1;
+	int k = 0;
+	while (i < text_length) {
+		// reset matched character count
+		k = 0;
+
+		if (i >= text_size) {
+			// break out if i tries to step past text length
+			break;
+		}
+
+		while (k <= pat_len - 1 && pattern[pat_len - 1 - k] == text[i - k]) {
+			// increment matched character count
+			k++;
+		}
+		if (k == pat_len) {
+			// increment pattern count, text index
+			++count;
+			++i;
+
+		}
+		else {
+			i = i + shift_table[text[i]];
+		}
+	}
+	return count;
+	// Add count to total matches atomically
+
 }
 
 /**
