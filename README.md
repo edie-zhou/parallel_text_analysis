@@ -1,6 +1,6 @@
 # Hardware Accelerated Pattern Matching
 
-Rish Bhatnagar, Jacob Grimm, Josh Kall, Edie Zhou
+Rish Bhatnagar (rb42554), Jacob Grimm (jag9497), Josh Kall (jsk2544), Edie Zhou (ez3437)
 
 Spring 2020 final term project for EE 361C Multicore Computing.
 
@@ -24,4 +24,12 @@ Example of commmand prompt:
 
 ./match.exe him sample-texts/BibleKJV.txt  //searching for "him" in The Bible
 
-If running on TACC, use the batch file in the zip file
+If running on TACC, use the batch file in the zip file by typing in the following commands:
+
+```{bash}
+$ module load cuda
+$ module load gcc
+$ sbatch match-batch
+```
+
+Please modify the batch script to run different patterns and files on a cluster
