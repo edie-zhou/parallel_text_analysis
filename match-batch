@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH -J myGPU
+#SBATCH -o myGPU%j
+#SBATCH -N 1
+#SBATCH -n 1
+#SBATCH -p gtx
+#SBATCH -t 00:00:20
+#SBATCH -A EE-382C-EE-361C-Mult
+./match.exe Lord sample-texts/Bible_KJV.txt
+
